@@ -36,3 +36,17 @@ As tabelas tratadas têm chaves únicas para upsert idempotente por loja e ID Ge
 | `admin` | Matheus, Rodrigo | Sincronização, mapeamento de situações, usuários abaixo de admin e todas as lojas. |
 | `manager` | João Pedro | CRM, relatórios e lojas; pode reatribuir leads. |
 | `seller` | Vendedoras | Somente leads próprios e sua loja. |
+
+## Daemon do WhatsApp
+
+`php artisan whatsapp:listen` sobe um servidor HTTP local (padrão `127.0.0.1:8765`) que recebe as
+mensagens enviadas pela extensão do Chrome em `whatsapp-extension/` e grava cada uma, sem nunca
+reescrever, no arquivo do contato: `storage/app/whatsapp/<numero>.txt` (grupos:
+`grupo_<id>.txt`). Cada linha é `[2026-09-23 21:30:12] in|out | Nome: texto`, com quebras de
+linha escritas como `\n` e mídia como `[imagem]`, `[áudio]` etc. Os ids já gravados ficam em
+`storage/app/whatsapp/.seen/` para que reenvios não dupliquem linhas.
+
+Configure em `.env`: `WHATSAPP_TOKEN` (obrigatório; o mesmo token vai nas opções da extensão),
+`WHATSAPP_HOST` e `WHATSAPP_PORT`. Rode no host (`php artisan whatsapp:listen`), não no Sail; dentro
+do Sail é preciso `--host=0.0.0.0` e publicar a porta no `docker-compose.yml`. A instalação da
+extensão está em `whatsapp-extension/README.md`.

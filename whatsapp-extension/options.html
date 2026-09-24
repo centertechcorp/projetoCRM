@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <title>WhatsApp Logger: opções</title>
+    <style>
+        body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 420px; }
+        label { display: block; margin: 12px 0 4px; font-weight: 600; }
+        input { width: 100%; padding: 6px 8px; box-sizing: border-box; }
+        button { margin: 16px 8px 0 0; padding: 6px 14px; }
+        #status { margin-top: 16px; min-height: 1.4em; }
+    </style>
+</head>
+<body>
+    <h1>WhatsApp Logger</h1>
+
+    <label for="url">Endereço do daemon</label>
+    <input id="url" type="url" placeholder="http://127.0.0.1:8765">
+
+    <label for="token">Token (WHATSAPP_TOKEN do .env)</label>
+    <input id="token" type="password" autocomplete="off">
+
+    <button id="save">Salvar</button>
+    <button id="test">Testar conexão</button>
+
+    <p id="status" role="status"></p>
+
+    <script src="options.js"></script>
+</body>
+</html>
