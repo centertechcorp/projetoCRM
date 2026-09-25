@@ -28,7 +28,15 @@
 
     const emitted = new Set();
 
-    const serialized = (wid) => (wid && wid._serialized) || (typeof wid === 'string' ? wid : null);
+    // Versões antigas expõem `_serialized`; as atuais entregam um objeto cujo texto (toString) é o id.
+    const serialized = (wid) => {
+        if (wid === null || wid === undefined) return null;
+        if (typeof wid === 'string') return wid;
+        if (typeof wid._serialized === 'string' && wid._serialized) return wid._serialized;
+
+        const text = String(wid);
+        return text && text !== '[object Object]' ? text : null;
+    };
 
     function findCollections() {
         const req = window.require;
@@ -97,7 +105,7 @@
 
     function emit(msg, collections) {
         try {
-            const id = msg?.id?._serialized;
+            const id = serialized(msg?.id);
             if (!id || emitted.has(id) || SKIP_TYPES.has(msg.type)) return;
 
             const timestamp = Number(msg.t);
@@ -117,6 +125,7 @@
                         chat,
                         from_me: Boolean(msg.id.fromMe),
                         sender_name: String(senderName(msg, collections) || ''),
+                        sender_jid: msg.id.fromMe ? null : serialized(msg.author) || serialized(msg.id.participant),
                         body: String(textOf(msg)),
                         type: String(msg.type || 'chat'),
                         timestamp: Math.floor(timestamp),

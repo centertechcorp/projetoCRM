@@ -41,9 +41,15 @@ class MessageStore
         private readonly string $timezone,
     ) {}
 
+    /** Um armazenamento independente em uma subpasta (uma por conta de WhatsApp). */
+    public function within(string $directory): self
+    {
+        return new self("{$this->path}/{$directory}", $this->timezone);
+    }
+
     public function append(IncomingMessage $message): string
     {
-        $contact = $this->contactKey($message->chat);
+        $contact = self::contactKey($message->chat);
 
         if ($contact === null) {
             return self::IGNORED;
@@ -64,7 +70,7 @@ class MessageStore
      * Nome do arquivo do contato, derivado só de dígitos do JID.
      * Retorna null para status, listas de transmissão, canais e JIDs inválidos.
      */
-    public function contactKey(string $jid): ?string
+    public static function contactKey(string $jid): ?string
     {
         if (preg_match('/^(\d+(?:-\d+)?)(?::\d+)?@(c\.us|s\.whatsapp\.net|lid|g\.us)$/', $jid, $m) !== 1) {
             return null;

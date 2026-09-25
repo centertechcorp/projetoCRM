@@ -2,7 +2,9 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Models\WhatsappAccount;
 use Closure;
+use Throwable;
 
 /**
  * Trata uma requisição HTTP completa e devolve a resposta HTTP completa.
@@ -28,7 +30,11 @@ class MessageEndpoint
         private readonly ?string $token,
         private readonly int $maxBody,
         private readonly ?Closure $logger = null,
+        private readonly ?MessageRecorder $recorder = null,
     ) {}
+
+    /** @var array<int, MessageStore> */
+    private array $accountStores = [];
 
     public function handle(string $raw): string
     {
@@ -56,29 +62,72 @@ class MessageEndpoint
     private function receive(HttpRequest $request): string
     {
         $given = $request->header('x-token');
+        $account = null;
 
-        if ($this->token === null || $this->token === '' || $given === null || ! hash_equals($this->token, $given)) {
+        if ($this->recorder !== null) {
+            try {
+                $account = $this->recorder->authenticate($given);
+            } catch (Throwable $e) {
+                return $this->failure($e);
+            }
+
+            $authorized = $account !== null;
+        } else {
+            $authorized = $this->token !== null && $this->token !== '' && $given !== null && hash_equals($this->token, $given);
+        }
+
+        if (! $authorized) {
             return $this->json(401, ['error' => 'token inválido']);
         }
 
-        $message = IncomingMessage::fromArray(json_decode($request->body, true));
+        $payload = json_decode($request->body, true);
+        $message = IncomingMessage::fromArray($payload);
 
         if ($message === null) {
             return $this->json(400, ['error' => 'mensagem inválida']);
         }
 
-        $status = $this->store->append($message);
+        try {
+            // O banco manda: se ele falha, a extensão recebe 500 e reenvia depois (a fila dela guarda).
+            $status = $account !== null
+                ? $this->recorder->record($account, $message, 'web_extension', $payload)
+                : null;
+
+            // O arquivo de texto é a cópia de segurança e deduplica sozinho por id.
+            $fileStatus = $this->storeFor($account)->append($message);
+            $status ??= $fileStatus;
+        } catch (Throwable $e) {
+            return $this->failure($e);
+        }
 
         if ($this->logger !== null) {
             ($this->logger)(sprintf(
-                '%s %s %s',
+                '%s %s %s%s',
                 $status,
                 $message->fromMe ? 'out' : 'in',
-                $this->store->contactKey($message->chat) ?? $message->chat,
+                MessageStore::contactKey($message->chat) ?? $message->chat,
+                $account !== null ? " (conta {$account->label})" : '',
             ));
         }
 
         return $this->json(200, ['status' => $status]);
+    }
+
+    /** Cada conta grava os arquivos na própria subpasta, porque o mesmo contato pode falar com mais de um número. */
+    private function storeFor(?WhatsappAccount $account): MessageStore
+    {
+        return $account === null
+            ? $this->store
+            : $this->accountStores[$account->id] ??= $this->store->within((string) $account->id);
+    }
+
+    private function failure(Throwable $e): string
+    {
+        if ($this->logger !== null) {
+            ($this->logger)('erro: '.$e->getMessage());
+        }
+
+        return $this->json(500, ['error' => 'falha ao gravar']);
     }
 
     /** @param  array<string, mixed>  $data */
