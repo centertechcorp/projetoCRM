@@ -91,9 +91,7 @@ webhook) e `META_WHATSAPP_APP_SECRET` (do app, valida a assinatura `X-Hub-Signat
 requisição). Crie a conta com o `phone_number_id` do painel da Meta:
 
 ```bash
-php artisan whatsapp:account CENTER "WhatsApp CENTER (Meta)" --provider=cloud_api
-# depois, associe o phone_number_id manualmente (ainda não há flag para isso):
-php artisan tinker --execute='App\Models\WhatsappAccount::where("label", "WhatsApp CENTER (Meta)")->update(["provider_account_ref" => "<phone_number_id>"]);'
+php artisan whatsapp:account CENTER "WhatsApp CENTER (Meta)" --provider=cloud_api --ref=<phone_number_id>
 ```
 
 **Checklist para testar com o número de teste da Meta (não precisa da empresa verificada):**

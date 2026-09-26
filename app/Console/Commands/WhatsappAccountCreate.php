@@ -9,7 +9,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
-#[Signature('whatsapp:account {store : Código da loja (CENTER, GENIUS ou MIXCELL)} {label : Nome da conta} {--phone= : Número do WhatsApp, só dígitos} {--provider=web_extension : Provedor das mensagens}')]
+#[Signature('whatsapp:account {store : Código da loja (CENTER, GENIUS ou MIXCELL)} {label : Nome da conta} {--phone= : Número do WhatsApp, só dígitos} {--provider=web_extension : Provedor das mensagens (web_extension, cloud_api...)} {--ref= : Identificador da conta no provedor (ex.: phone_number_id da Meta)}')]
 #[Description('Cria uma conta de WhatsApp para uma loja e mostra o token da extensão (uma vez só)')]
 class WhatsappAccountCreate extends Command
 {
@@ -31,6 +31,14 @@ class WhatsappAccountCreate extends Command
             return self::FAILURE;
         }
 
+        $ref = $this->option('ref');
+
+        if ($ref !== null && preg_match('/^\d{1,128}$/', $ref) !== 1) {
+            $this->components->error('--ref deve ter só dígitos (ex.: o Phone Number ID do painel da Meta).');
+
+            return self::FAILURE;
+        }
+
         $provider = (string) $this->option('provider');
         $token = $provider === 'web_extension' ? Str::random(40) : null;
 
@@ -39,6 +47,7 @@ class WhatsappAccountCreate extends Command
             'label' => (string) $this->argument('label'),
             'phone' => $phone,
             'provider' => $provider,
+            'provider_account_ref' => $ref,
             'token_hash' => $token !== null ? WhatsappAccount::hashToken($token) : null,
         ]);
 
