@@ -66,6 +66,18 @@ return [
 
         // Por quantos dias um lead "comprou" fica visível no pós-venda antes de arquivar.
         'retention_days' => (int) env('WHATSAPP_FOLLOWUP_RETENTION_DAYS', 30),
+
+        // Não sugere mais reabordagem nova depois de já ter tentado esse tanto de vezes.
+        'max_attempts' => (int) env('WHATSAPP_FOLLOWUP_MAX_ATTEMPTS', 3),
+
+        // Se a última mensagem do cliente for só uma dessas (sem acento/pontuação, minúsculas),
+        // a conversa é tratada como encerrada, não como "sem resposta".
+        'closing_phrases' => [
+            'obrigado', 'obrigada', 'ok', 'okay', 'blz', 'beleza',
+            'valeu', 'de nada', 'por nada',
+            'entendi', 'certo', 'tranquilo', 'tudo bem',
+            '👍', '👍🏻', '👍🏼', '👍🏽', '👍🏾', '👍🏿',
+        ],
     ],
 
 ];

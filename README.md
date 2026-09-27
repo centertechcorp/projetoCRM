@@ -127,6 +127,11 @@ mensagem do cliente. `customer_unanswered` = o cliente falou por último; `custo
 respondemos e ele sumiu. Não repete sugestão em aberto nem antes do `WHATSAPP_FOLLOWUP_COOLDOWN_DAYS`
 (padrão 14 dias). Idempotente: rodar de novo sem mensagem nova não duplica nada.
 
+Dois filtros evitam sugestão sem necessidade: se a última mensagem do cliente for só uma despedida
+("obrigado", "valeu", "👍" — lista em `whatsapp.followup.closing_phrases`), não sugere reabordagem,
+mas o lead continua registrado; e depois de `WHATSAPP_FOLLOWUP_MAX_ATTEMPTS` (padrão 3) sugestões
+para o mesmo lead, o detector para de insistir (fica só o histórico, visível no painel).
+
 ```bash
 php artisan whatsapp:leads:detect [--store=CENTER]     # procura conversas paradas
 php artisan whatsapp:leads:list [--status=open|won|lost|all]
@@ -154,6 +159,23 @@ de aprovado — o envio em si continua manual, feito pela pessoa).
 
 Dados fictícios para ver o painel funcionando antes de haver conversa real:
 `php artisan db:seed --class=WhatsappDemoSeeder` (nunca em produção; não roda pelo seeder padrão).
+
+### Importar um export manual (sem webhook em tempo real)
+
+Enquanto não há um conector ao vivo (extensão, Meta, WAHA/Evolution) para um número, dá para
+importar um arquivo que alguém exportou manualmente (ex.: um dump do bot de outro desenvolvedor):
+
+```bash
+php artisan whatsapp:import:file caminho/export.json --account=<id ou label exato da conta>
+php artisan whatsapp:leads:detect   # depois, gera os leads normalmente a partir do que foi importado
+```
+
+Aceita `.json` (lista de objetos) ou `.csv` (com cabeçalho), nas mesmas colunas que
+`App\Services\Whatsapp\IncomingMessage::fromArray` já usa: `id, chat, from_me, sender_name, body,
+type, timestamp`, e opcionalmente `sender_jid, quoted_external_id, sent_via`. No CSV, `from_me`
+aceita `1/0` ou `true/false`, e `timestamp` pode vir como texto (segundos desde 1970). Linhas
+inválidas são puladas e contadas, sem interromper o restante do arquivo; a saída do comando mostra
+só a contagem, nunca telefone ou texto de cliente no terminal.
 
 ### Assets (Tailwind/Vite)
 

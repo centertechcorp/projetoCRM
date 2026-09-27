@@ -12,6 +12,7 @@ use App\Models\WhatsappMessage;
 use App\Services\Whatsapp\StalledConversationDetector;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class StalledConversationDetectorTest extends TestCase
@@ -163,12 +164,95 @@ class StalledConversationDetectorTest extends TestCase
         $this->assertNull(Customer::first()->deleted_at);
     }
 
+    public function test_does_not_suggest_followup_when_customer_only_said_goodbye(): void
+    {
+        $this->chat('5534999990010', [
+            ['in', -50, 'Quanto custa a tela do iPhone 11?'],
+            ['out', -49, 'Fica R$ 150 com instalação'],
+            ['in', -48, 'Obrigado!'],
+        ]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(0, $result['followups_created']);
+        $this->assertSame(1, Lead::count());
+        $this->assertSame(0, LeadFollowup::count());
+        $this->assertNotNull(Lead::sole()->last_contact_at);
+    }
+
+    public function test_still_suggests_followup_for_a_real_unanswered_question(): void
+    {
+        $this->chat('5534999990011', [['in', -48, 'Vocês têm tela de iPhone 11?']]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(1, $result['followups_created']);
+    }
+
+    public function test_stops_suggesting_after_reaching_the_configured_attempt_limit(): void
+    {
+        // Sem cooldown, para isolar só o efeito do teto de tentativas.
+        config(['whatsapp.followup.max_attempts' => 2, 'whatsapp.followup.cooldown_days' => 0]);
+        $chat = $this->chat('5534999990012', [['in', -48]]);
+        $detector = $this->detector();
+
+        // 1ª tentativa: cria. Descarta, e "reabre" a conversa para a próxima rodada.
+        $detector->detect();
+        $this->dismiss(LeadFollowup::sole());
+        $chat->update(['last_message_at' => now()->subHours(48)]);
+
+        // 2ª tentativa: ainda dentro do teto (1 < 2), cria de novo.
+        $detector->detect();
+        $this->assertSame(2, LeadFollowup::count());
+        $this->dismiss(LeadFollowup::where('status', 'candidate')->sole());
+        $chat->update(['last_message_at' => now()->subHours(48)]);
+
+        // 3ª tentativa: já bateu o teto (2 >= 2), não cria mais.
+        $result = $detector->detect();
+
+        $this->assertSame(0, $result['followups_created']);
+        $this->assertSame(2, LeadFollowup::count());
+    }
+
+    public function test_allows_more_attempts_when_the_limit_is_raised(): void
+    {
+        config(['whatsapp.followup.max_attempts' => 1, 'whatsapp.followup.cooldown_days' => 0]);
+        $chat = $this->chat('5534999990013', [['in', -48]]);
+        $detector = $this->detector();
+
+        $detector->detect();
+        $this->assertSame(1, LeadFollowup::count());
+        $this->dismiss(LeadFollowup::sole());
+        $chat->update(['last_message_at' => now()->subHours(48)]);
+
+        // Já bateu o teto de 1; sobe o teto e tenta de novo.
+        config(['whatsapp.followup.max_attempts' => 2]);
+        $result = $detector->detect();
+
+        $this->assertSame(1, $result['followups_created']);
+        $this->assertSame(2, LeadFollowup::count());
+    }
+
+    /**
+     * Descarta e marca `updated_at` claramente no passado (via query builder, sem o
+     * "touch" automático do Eloquent), para o cooldown não ficar ambíguo por causa do
+     * arredondamento de precisão do timestamp(0) do Postgres quando cooldown_days = 0.
+     */
+    private function dismiss(LeadFollowup $followup): void
+    {
+        DB::table('lead_followups')->where('id', $followup->id)->update([
+            'status' => 'dismissed',
+            'dismissed_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
+        ]);
+    }
+
     private function detector(): StalledConversationDetector
     {
         return app(StalledConversationDetector::class);
     }
 
-    /** @param  array<int, array{0: string, 1: int}>  $messages */
+    /** @param  array<int, array{0: string, 1: int}|array{0: string, 1: int, 2: string}>  $messages */
     private function chat(string $phone, array $messages): WhatsappChat
     {
         $chat = WhatsappChat::create([
@@ -182,8 +266,9 @@ class StalledConversationDetectorTest extends TestCase
 
         $lastAt = null;
 
-        foreach ($messages as $i => [$direction, $hoursAgo]) {
-            $lastAt = $this->message($chat, $direction, $hoursAgo, "{$phone}-{$i}");
+        foreach ($messages as $i => $message) {
+            [$direction, $hoursAgo] = $message;
+            $lastAt = $this->message($chat, $direction, $hoursAgo, "{$phone}-{$i}", $message[2] ?? 'oi');
         }
 
         $chat->update(['last_message_at' => $lastAt]);
@@ -191,7 +276,7 @@ class StalledConversationDetectorTest extends TestCase
         return $chat;
     }
 
-    private function message(WhatsappChat $chat, string $direction, int $hoursAgo, string $externalId): CarbonImmutable
+    private function message(WhatsappChat $chat, string $direction, int $hoursAgo, string $externalId, string $body = 'oi'): CarbonImmutable
     {
         $sentAt = CarbonImmutable::now()->addHours($hoursAgo);
 
@@ -202,7 +287,7 @@ class StalledConversationDetectorTest extends TestCase
             'direction' => $direction,
             'sender_name' => $direction === 'in' ? 'Cliente Teste' : null,
             'type' => 'chat',
-            'body' => 'oi',
+            'body' => $body,
             'sent_at' => $sentAt,
             'source' => 'web_extension',
         ]);

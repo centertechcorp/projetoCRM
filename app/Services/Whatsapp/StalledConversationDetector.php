@@ -56,9 +56,9 @@ class StalledConversationDetector
     private function processChat(WhatsappChat $chat, array $config): array
     {
         $lastMessage = $chat->messages()->orderByDesc('sent_at')->first();
-        $hasCustomerMessage = $chat->messages()->where('direction', 'in')->exists();
+        $lastCustomerMessage = $chat->messages()->where('direction', 'in')->orderByDesc('sent_at')->first();
 
-        if ($lastMessage === null || ! $hasCustomerMessage) {
+        if ($lastMessage === null || $lastCustomerMessage === null) {
             return ['lead_created' => false, 'followup_created' => false];
         }
 
@@ -79,7 +79,7 @@ class StalledConversationDetector
         $lead->whatsapp_chat_id = $chat->id;
         $lead->save();
 
-        $followupCreated = $this->maybeCreateFollowup($lead, $reason, $config);
+        $followupCreated = $this->maybeCreateFollowup($lead, $reason, $lastCustomerMessage->body, $config);
 
         return ['lead_created' => $leadCreated, 'followup_created' => $followupCreated];
     }
@@ -135,8 +135,20 @@ class StalledConversationDetector
     }
 
     /** @param  array<string, mixed>  $config */
-    private function maybeCreateFollowup(Lead $lead, string $reason, array $config): bool
+    private function maybeCreateFollowup(Lead $lead, string $reason, string $lastCustomerMessageBody, array $config): bool
     {
+        // O cliente só se despediu ("obrigado", "valeu"); a conversa terminou bem,
+        // não precisa de reabordagem — mas o contato acima já atualizou o lead.
+        if (ClosingPhraseMatcher::isClosing($lastCustomerMessageBody, $config['closing_phrases'])) {
+            return false;
+        }
+
+        $attempts = $lead->followups()->where('type', 'recover')->count();
+
+        if ($attempts >= $config['max_attempts']) {
+            return false;
+        }
+
         $openExists = $lead->followups()
             ->whereIn('status', ['candidate', 'draft_ready', 'approved'])
             ->exists();
