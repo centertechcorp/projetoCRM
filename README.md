@@ -112,3 +112,58 @@ php artisan whatsapp:account CENTER "WhatsApp CENTER (Meta)" --provider=cloud_ap
 
 Um túnel do `ngrok` grátis muda de endereço a cada reinício, então serve só para teste; produção
 precisa de domínio e servidor fixos, com o webhook reconfigurado para essa URL definitiva.
+
+## CRM de leads (a partir do WhatsApp)
+
+Transforma conversas de WhatsApp paradas em **leads** para reabordar, e mantém quem já comprou
+para o pós-venda. Tabelas: `customers` (um por telefone), `leads` (um aberto por cliente e loja;
+histórico preservado quando fecha) e `lead_followups` (a sugestão de mensagem, sempre pendente de
+aprovação de uma pessoa — nada é enviado pelo sistema).
+
+`App\Services\Whatsapp\StalledConversationDetector` cria/atualiza leads a partir de
+`whatsapp_chats`/`whatsapp_messages`: conversa individual, parada há `WHATSAPP_FOLLOWUP_MIN_IDLE_HOURS`
+(padrão 24h) e no máximo `WHATSAPP_FOLLOWUP_MAX_AGE_DAYS` (padrão 30 dias), com pelo menos uma
+mensagem do cliente. `customer_unanswered` = o cliente falou por último; `customer_silent` =
+respondemos e ele sumiu. Não repete sugestão em aberto nem antes do `WHATSAPP_FOLLOWUP_COOLDOWN_DAYS`
+(padrão 14 dias). Idempotente: rodar de novo sem mensagem nova não duplica nada.
+
+```bash
+php artisan whatsapp:leads:detect [--store=CENTER]     # procura conversas paradas
+php artisan whatsapp:leads:list [--status=open|won|lost|all]
+php artisan whatsapp:leads:close <id> won|lost [--reason=]
+php artisan whatsapp:leads:archive                     # arquiva quem "comprou" após a retenção (nunca apaga)
+php artisan whatsapp:followups:review <id> approve|dismiss --user=<id>
+```
+
+Quem comprou (`status=won`) nunca é excluído: fica `WHATSAPP_FOLLOWUP_RETENTION_DAYS` (padrão 30
+dias) disponível para pós-venda antes de `whatsapp:leads:archive` marcar como arquivado.
+
+### Painel (`/painel`)
+
+Login simples (guard `web`, tabela `users`; sem registro público). Defina a senha de alguém já
+cadastrado (a seed inicial só tem nome, sem e-mail):
+
+```bash
+php artisan user:password caio@empresa.com --name="Caio"   # pede a senha, nunca a imprime
+```
+
+`seller` só vê a loja em `users.store_id`; `manager`/`admin`/`owner` veem todas. O painel lista os
+leads (aba Leads abertos / Pós-venda / Todos) com a sugestão de reabordagem e os botões **Aprovar**,
+**Descartar**, **Comprou**, **Perdeu** e **Abrir no WhatsApp** (`wa.me` com o texto pronto, só depois
+de aprovado — o envio em si continua manual, feito pela pessoa).
+
+Dados fictícios para ver o painel funcionando antes de haver conversa real:
+`php artisan db:seed --class=WhatsappDemoSeeder` (nunca em produção; não roda pelo seeder padrão).
+
+### Assets (Tailwind/Vite)
+
+O painel usa Tailwind 4 via Vite. Compile antes de abrir no navegador: `npm install && npm run build`
+(ou `npm run dev` durante o desenvolvimento). Nos testes automatizados isso não é necessário —
+`Tests\TestCase` já chama `withoutVite()`.
+
+### Sessão, cache e fila
+
+`SESSION_DRIVER`, `CACHE_STORE` e `QUEUE_CONNECTION` usam `database` no `.env`, e por isso as tabelas
+`sessions`, `cache`/`cache_locks` e `jobs` (migrations `2026_09_27_182447` a `182449`) fazem parte do
+`php artisan migrate`. Sem elas, login e qualquer coisa que use `RateLimiter`/cache derruba com
+`relation "sessions" does not exist`.

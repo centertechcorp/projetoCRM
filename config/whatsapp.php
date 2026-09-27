@@ -44,4 +44,28 @@ return [
         'app_secret' => env('META_WHATSAPP_APP_SECRET'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Follow-up de conversas paradas
+    |--------------------------------------------------------------------------
+    |
+    | Regras do App\Services\Whatsapp\StalledConversationDetector: quando uma conversa
+    | vira lead a reabordar. Horas/dias contados a partir da mensagem mais recente.
+    |
+    */
+
+    'followup' => [
+        // Só considera "parada" depois de tantas horas sem mensagem nova.
+        'min_idle_hours' => (int) env('WHATSAPP_FOLLOWUP_MIN_IDLE_HOURS', 24),
+
+        // Conversas mais antigas que isso não geram mais follow-up novo (só o que já existe).
+        'max_age_days' => (int) env('WHATSAPP_FOLLOWUP_MAX_AGE_DAYS', 30),
+
+        // Não gera um follow-up novo para a mesma conversa antes desse intervalo.
+        'cooldown_days' => (int) env('WHATSAPP_FOLLOWUP_COOLDOWN_DAYS', 14),
+
+        // Por quantos dias um lead "comprou" fica visível no pós-venda antes de arquivar.
+        'retention_days' => (int) env('WHATSAPP_FOLLOWUP_RETENTION_DAYS', 30),
+    ],
+
 ];
