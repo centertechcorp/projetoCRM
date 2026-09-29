@@ -5,6 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Models\Event;
 use App\Models\WhatsappAccount;
 use App\Models\WhatsappChat;
+use App\Models\WhatsappGroupMessage;
 use App\Models\WhatsappMedia;
 use App\Models\WhatsappMessage;
 use Carbon\CarbonImmutable;
@@ -53,6 +54,10 @@ class MessageRecorder
             return self::IGNORED;
         }
 
+        if (str_ends_with($message->chat, '@g.us')) {
+            return $this->recordGroupMessage($account, $message, $chatKey);
+        }
+
         $exists = WhatsappMessage::query()
             ->where('whatsapp_account_id', $account->id)
             ->where('external_id', $message->id)
@@ -96,9 +101,62 @@ class MessageRecorder
         return self::STORED;
     }
 
+    /**
+     * Grupo não é conversa de cliente individual: grupo na denylist (config/whatsapp.php)
+     * é ignorado por completo assim que aparece; os demais só são gravados em
+     * whatsapp_group_messages se ProductTopicMatcher achar que falam de eletrônico.
+     */
+    private function recordGroupMessage(WhatsappAccount $account, IncomingMessage $message, string $chatKey): string
+    {
+        $sentAt = CarbonImmutable::createFromTimestamp($message->timestamp);
+        $result = self::IGNORED;
+
+        DB::transaction(function () use ($account, $message, $chatKey, $sentAt, &$result): void {
+            $chat = $this->chatFor($account, $message, $chatKey, $sentAt);
+
+            if ($chat->ignored) {
+                return;
+            }
+
+            $exists = WhatsappGroupMessage::query()
+                ->where('whatsapp_account_id', $account->id)
+                ->where('external_id', $message->id)
+                ->exists();
+
+            if ($exists) {
+                $result = self::DUPLICATE;
+
+                return;
+            }
+
+            $keywords = config('whatsapp.group_topics.keywords', []);
+            $maxPriceMentions = (int) config('whatsapp.group_topics.max_price_mentions', 1);
+
+            if (! ProductTopicMatcher::isRelevant($message->body, $keywords, $maxPriceMentions)) {
+                return;
+            }
+
+            WhatsappGroupMessage::create([
+                'whatsapp_account_id' => $account->id,
+                'external_id' => $message->id,
+                'group_jid' => $message->chat,
+                'group_name' => $chat->display_name,
+                'sender_jid' => $message->senderJid,
+                'sender_name' => $this->nullable($message->senderName),
+                'body' => $this->clean($message->body),
+                'sent_at' => $sentAt,
+            ]);
+
+            $result = self::STORED;
+        });
+
+        return $result;
+    }
+
     private function chatFor(WhatsappAccount $account, IncomingMessage $message, string $chatKey, CarbonImmutable $sentAt): WhatsappChat
     {
         $isGroup = str_ends_with($message->chat, '@g.us');
+        $groupName = $isGroup ? $this->nullable($message->groupName ?? '') : null;
 
         $chat = WhatsappChat::firstOrCreate(
             ['whatsapp_account_id' => $account->id, 'chat_key' => $chatKey],
@@ -107,15 +165,28 @@ class MessageRecorder
                 'kind' => $isGroup ? 'group' : 'individual',
                 // Só JIDs de telefone trazem o número; "@lid" é um identificador de privacidade.
                 'phone' => ! $isGroup && preg_match('/^(\d+)(?::\d+)?@(c\.us|s\.whatsapp\.net)$/', $message->chat, $m) === 1 ? $m[1] : null,
+                'display_name' => $groupName,
+                'ignored' => $isGroup && $this->isDenylistedGroup($groupName),
             ],
         );
 
         $changes = [];
 
-        // O nome do contato vem de quem escreve; em grupo, quem escreve é outra pessoa.
-        $name = $this->nullable($message->senderName);
-        if (! $isGroup && ! $message->fromMe && $name !== null && $chat->display_name !== $name) {
-            $changes['display_name'] = $name;
+        if ($isGroup) {
+            if ($groupName !== null && $chat->display_name !== $groupName) {
+                $changes['display_name'] = $groupName;
+            }
+
+            // Cobre o caso do nome do grupo só ficar disponível numa mensagem seguinte.
+            if (! $chat->ignored && $this->isDenylistedGroup($groupName)) {
+                $changes['ignored'] = true;
+            }
+        } else {
+            // O nome do contato vem de quem escreve; em grupo, quem escreve é outra pessoa.
+            $name = $this->nullable($message->senderName);
+            if (! $message->fromMe && $name !== null && $chat->display_name !== $name) {
+                $changes['display_name'] = $name;
+            }
         }
 
         if ($chat->last_message_at === null || $sentAt->greaterThan($chat->last_message_at)) {
@@ -127,6 +198,23 @@ class MessageRecorder
         }
 
         return $chat;
+    }
+
+    private function isDenylistedGroup(?string $groupName): bool
+    {
+        if ($groupName === null) {
+            return false;
+        }
+
+        $normalized = mb_strtolower(trim($groupName));
+
+        foreach (config('whatsapp.group_denylist', []) as $denied) {
+            if ($normalized === mb_strtolower(trim($denied))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function recordMedia(WhatsappAccount $account, WhatsappMessage $message, IncomingMedia $media, CarbonImmutable $sentAt): void

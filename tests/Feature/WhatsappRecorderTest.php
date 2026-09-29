@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Store;
 use App\Models\WhatsappAccount;
 use App\Models\WhatsappChat;
+use App\Models\WhatsappGroupMessage;
 use App\Models\WhatsappMedia;
 use App\Models\WhatsappMessage;
 use App\Services\Whatsapp\IncomingMedia;
@@ -79,21 +80,103 @@ class WhatsappRecorderTest extends TestCase
         $this->assertSame(1, Event::count());
     }
 
-    public function test_group_message_keeps_who_spoke_and_does_not_rename_the_group(): void
+    public function test_group_message_creates_the_chat_with_its_name_but_ignores_irrelevant_body(): void
     {
-        $this->recorder()->record($this->account, $this->message(
+        $status = $this->recorder()->record($this->account, $this->message(
             id: 'g1',
             chat: '5511963381709-1561816551@g.us',
             name: 'Valio',
+            body: 'oi',
             senderJid: '113362037915713@lid',
+            groupName: 'Grupo qualquer',
         ), 'web_extension');
+
+        $this->assertSame('ignored', $status);
 
         $chat = WhatsappChat::sole();
         $this->assertSame('grupo_5511963381709_1561816551', $chat->chat_key);
         $this->assertSame('group', $chat->kind);
         $this->assertNull($chat->phone);
-        $this->assertNull($chat->display_name);
-        $this->assertSame('113362037915713@lid', WhatsappMessage::sole()->sender_jid);
+        $this->assertSame('Grupo qualquer', $chat->display_name);
+        $this->assertFalse($chat->ignored);
+        $this->assertSame(0, WhatsappMessage::count());
+        $this->assertSame(0, WhatsappGroupMessage::count());
+    }
+
+    public function test_denylisted_group_is_ignored_even_talking_about_electronics(): void
+    {
+        config(['whatsapp.group_denylist' => ['VIP CENTER TECH']]);
+
+        $status = $this->recorder()->record($this->account, $this->message(
+            id: 'g1',
+            chat: '5511963381709-1561816551@g.us',
+            body: 'Tenho um iPhone 15 pra vender',
+            groupName: 'vip center tech',
+        ), 'web_extension');
+
+        $this->assertSame('ignored', $status);
+        $this->assertTrue(WhatsappChat::sole()->ignored);
+        $this->assertSame(0, WhatsappGroupMessage::count());
+    }
+
+    public function test_non_denylisted_group_stores_only_electronics_talk(): void
+    {
+        config(['whatsapp.group_denylist' => []]);
+
+        $ignored = $this->recorder()->record($this->account, $this->message(
+            id: 'g1',
+            chat: '5511963381709-1561816551@g.us',
+            name: 'Fulano',
+            body: 'Vestido tamanho m',
+            groupName: 'Grupo de vendas',
+        ), 'web_extension');
+
+        $stored = $this->recorder()->record($this->account, $this->message(
+            id: 'g2',
+            chat: '5511963381709-1561816551@g.us',
+            name: 'Fulano',
+            body: 'Alguém tem carregador de iPhone?',
+            senderJid: '113362037915713@lid',
+            groupName: 'Grupo de vendas',
+        ), 'web_extension');
+
+        $this->assertSame('ignored', $ignored);
+        $this->assertSame('stored', $stored);
+        $this->assertSame(0, WhatsappMessage::count());
+
+        $message = WhatsappGroupMessage::sole();
+        $this->assertSame('Grupo de vendas', $message->group_name);
+        $this->assertSame('Fulano', $message->sender_name);
+        $this->assertSame('113362037915713@lid', $message->sender_jid);
+        $this->assertSame('Alguém tem carregador de iPhone?', $message->body);
+    }
+
+    public function test_group_message_that_looks_like_a_price_catalog_is_ignored(): void
+    {
+        config(['whatsapp.group_denylist' => []]);
+
+        $status = $this->recorder()->record($this->account, $this->message(
+            id: 'g1',
+            chat: '5511963381709-1561816551@g.us',
+            body: "iPhone 16 Pro Max R\$ 5.499\niPhone 16 Pro R\$ 4.499",
+            groupName: 'Grupo de vendas',
+        ), 'web_extension');
+
+        $this->assertSame('ignored', $status);
+        $this->assertSame(0, WhatsappGroupMessage::count());
+    }
+
+    public function test_group_message_duplicate_by_external_id_is_not_stored_twice(): void
+    {
+        config(['whatsapp.group_denylist' => []]);
+        $message = $this->message(id: 'g1', chat: '5511963381709-1561816551@g.us', body: 'iPhone com defeito na tela', groupName: 'Grupo de vendas');
+
+        $first = $this->recorder()->record($this->account, $message, 'web_extension');
+        $second = $this->recorder()->record($this->account, $message, 'web_extension');
+
+        $this->assertSame('stored', $first);
+        $this->assertSame('duplicate', $second);
+        $this->assertSame(1, WhatsappGroupMessage::count());
     }
 
     public function test_lid_chat_has_no_phone(): void
@@ -353,8 +436,9 @@ class WhatsappRecorderTest extends TestCase
         ?IncomingMedia $media = null,
         ?string $quoted = null,
         ?string $sentVia = null,
+        ?string $groupName = null,
     ): IncomingMessage {
-        return new IncomingMessage($id, $chat, $fromMe, $name, $body, $type, 1790000000, $senderJid, $media, $quoted, $sentVia);
+        return new IncomingMessage($id, $chat, $fromMe, $name, $body, $type, 1790000000, $senderJid, $media, $quoted, $sentVia, $groupName);
     }
 
     /** @param  array<string, mixed>  $overrides */

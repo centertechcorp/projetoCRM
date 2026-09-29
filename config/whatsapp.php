@@ -84,4 +84,41 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Mensagens de grupo
+    |--------------------------------------------------------------------------
+    |
+    | Grupo não vira lead (App\Services\Whatsapp\StalledConversationDetector só olha
+    | conversa individual), mas ainda assim dá pra guardar o que interessa. Grupos na
+    | denylist são ignorados por completo assim que aparecem (nada é gravado, nem
+    | checa assunto). Os demais passam pelo App\Services\Whatsapp\ProductTopicMatcher:
+    | só é gravado em whatsapp_group_messages se falar de algum termo da lista e não
+    | parecer catálogo de preço.
+    |
+    */
+
+    'group_denylist' => [
+        'Compra, Venda e troca de Frutal-MG',
+        'VENDAS DE FRUTAL-MG',
+        'VIP CENTER TECH',
+        'Center Tech equipe',
+        'PEDIDOS CENTER TECH',
+        'ORÇAMENTO CENTER TECH',
+        'FRETE CAIO FRUTAL x BARRETOS',
+    ],
+
+    'group_topics' => [
+        'keywords' => [
+            'celular', 'smartphone', 'iphone', 'ipad', 'samsung', 'xiaomi', 'motorola', 'redmi',
+            'notebook', 'tablet', 'carregador', 'fone', 'fone de ouvido', 'headset', 'airpods',
+            'capinha', 'capa', 'pelicula', 'película', 'tela', 'display', 'bateria', 'placa',
+            'peca', 'peça', 'eletronico', 'eletrônico', 'imei', 'gb',
+        ],
+
+        // Mensagem com mais de tantos "R$" vira tabela de preço/catálogo, não pergunta de
+        // cliente — ignorada mesmo citando produto.
+        'max_price_mentions' => (int) env('WHATSAPP_GROUP_MAX_PRICE_MENTIONS', 1),
+    ],
+
 ];

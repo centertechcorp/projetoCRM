@@ -84,6 +84,16 @@
         return jid;
     }
 
+    // Assunto do grupo, só pra facilitar identificar qual é qual nos comandos do painel.
+    function groupName(remote, collections) {
+        try {
+            const chat = collections.Chat?.get(remote);
+            return chat?.name || chat?.formattedTitle || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
     function senderName(msg, collections) {
         if (msg.id?.fromMe) return '';
 
@@ -117,6 +127,8 @@
             emitted.add(id);
             if (emitted.size > MAX_REMEMBERED_IDS) emitted.delete(emitted.values().next().value);
 
+            const isGroup = chat.endsWith('@g.us');
+
             window.postMessage(
                 {
                     source: SOURCE,
@@ -126,6 +138,7 @@
                         from_me: Boolean(msg.id.fromMe),
                         sender_name: String(senderName(msg, collections) || ''),
                         sender_jid: msg.id.fromMe ? null : serialized(msg.author) || serialized(msg.id.participant),
+                        group_name: isGroup ? groupName(msg.id.remote, collections) : null,
                         body: String(textOf(msg)),
                         type: String(msg.type || 'chat'),
                         timestamp: Math.floor(timestamp),

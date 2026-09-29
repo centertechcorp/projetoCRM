@@ -16,6 +16,7 @@ final readonly class IncomingMessage
         public ?IncomingMedia $media = null,
         public ?string $quotedExternalId = null,
         public ?string $sentVia = null,
+        public ?string $groupName = null,
     ) {}
 
     public static function fromArray(mixed $data): ?self
@@ -34,6 +35,7 @@ final readonly class IncomingMessage
         $senderJid = $data['sender_jid'] ?? null;
         $quoted = $data['quoted_external_id'] ?? null;
         $sentVia = $data['sent_via'] ?? null;
+        $groupName = $data['group_name'] ?? null;
 
         $valid = is_string($id) && preg_match('/^[\w.@:-]{1,200}$/', $id) === 1
             && is_string($chat) && strlen($chat) <= 200
@@ -44,7 +46,8 @@ final readonly class IncomingMessage
             && is_string($type) && preg_match('/^[\w-]{1,40}$/', $type) === 1
             && ($senderJid === null || (is_string($senderJid) && strlen($senderJid) <= 200))
             && ($quoted === null || (is_string($quoted) && strlen($quoted) <= 200))
-            && ($sentVia === null || (is_string($sentVia) && strlen($sentVia) <= 16));
+            && ($sentVia === null || (is_string($sentVia) && strlen($sentVia) <= 16))
+            && ($groupName === null || (is_string($groupName) && strlen($groupName) <= 255));
 
         if (! $valid) {
             return null;
@@ -56,6 +59,7 @@ final readonly class IncomingMessage
             null,
             $quoted === '' ? null : $quoted,
             $sentVia === '' ? null : $sentVia,
+            $groupName === '' ? null : $groupName,
         );
     }
 }
