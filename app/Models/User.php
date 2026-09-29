@@ -34,6 +34,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'owner_slot' => 'integer',
+            'can_decide' => 'boolean',
         ];
     }
 }

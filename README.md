@@ -143,6 +143,19 @@ php artisan whatsapp:followups:review <id> approve|dismiss --user=<id>
 Quem comprou (`status=won`) nunca é excluído: fica `WHATSAPP_FOLLOWUP_RETENTION_DAYS` (padrão 30
 dias) disponível para pós-venda antes de `whatsapp:leads:archive` marcar como arquivado.
 
+### Reconectar quem desistiu (`status=lost`)
+
+`whatsapp:leads:detect` também roda `App\Services\Leads\LostLeadReconnector`: quem foi marcado como
+perdido ganha uma nova sugestão de reabordagem (motivo `lost_recovery`) depois de
+`WHATSAPP_FOLLOWUP_LOST_RECONNECT_AFTER_DAYS` (padrão 5 dias) — mesmo que o cliente tenha dito
+explicitamente que não queria nada; ninguém fica de fora. Vale o mesmo teto de tentativas e
+cooldown do resto (`App\Services\Leads\FollowupGate`, usado pelos dois detectores).
+
+A IA só escreve o rascunho dessa primeira mensagem (quando a Fase 2 existir); uma pessoa sempre
+aprova e manda pelo painel — sem exceção. Ao **aprovar**, `LeadDecisionService` já reabre o lead
+(`status=open`, limpa `lost_at`/`lost_reason`): ele sai da aba "Desistiu" e aparece em "Reconectar",
+e dali em diante quem conversa com o cliente é o funcionário, não o sistema.
+
 ### Painel (`/painel`)
 
 Login simples (guard `web`, tabela `users`; sem registro público). Defina a senha de alguém já
@@ -150,12 +163,16 @@ cadastrado (a seed inicial só tem nome, sem e-mail):
 
 ```bash
 php artisan user:password caio@empresa.com --name="Caio"   # pede a senha, nunca a imprime
+php artisan user:decide Caio on                             # libera aprovar/descartar/decidir no painel
 ```
 
-`seller` só vê a loja em `users.store_id`; `manager`/`admin`/`owner` veem todas. O painel lista os
-leads (aba Leads abertos / Pós-venda / Todos) com a sugestão de reabordagem e os botões **Aprovar**,
-**Descartar**, **Comprou**, **Perdeu** e **Abrir no WhatsApp** (`wa.me` com o texto pronto, só depois
-de aprovado — o envio em si continua manual, feito pela pessoa).
+`seller` só vê a loja em `users.store_id`; `manager`/`admin`/`owner` veem todas. Já **decidir**
+(aprovar, descartar, marcar como vendido/perdido) é por pessoa, não por papel — só quem tem
+`users.can_decide = true` (ligado com `user:decide`) vê os botões; todo mundo começa desligado.
+O painel lista os leads (abas Em andamento / Reconectar / Pós-venda / Desistiu / Todos) com a
+sugestão de reabordagem e os botões **Aprovar**, **Descartar**, **Comprou**, **Perdeu** e **Abrir no
+WhatsApp** (`wa.me` com o texto pronto quando existir, só depois de aprovado — o envio em si
+continua manual, feito pela pessoa).
 
 Dados fictícios para ver o painel funcionando antes de haver conversa real:
 `php artisan db:seed --class=WhatsappDemoSeeder` (nunca em produção; não roda pelo seeder padrão).

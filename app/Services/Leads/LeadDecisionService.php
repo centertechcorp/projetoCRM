@@ -21,6 +21,14 @@ class LeadDecisionService
             'approved_by' => $user->id,
             'approved_at' => CarbonImmutable::now(),
         ]);
+
+        // Aprovar a reconexão de quem desistiu já reabre o lead: sai da aba "Desistiu" e
+        // volta a valer como "aberto" — a partir daqui é o funcionário quem conversa.
+        $lead = $followup->lead;
+
+        if ($followup->reason === LostLeadReconnector::REASON_LOST_RECOVERY && $lead->status === 'lost') {
+            $lead->update(['status' => 'open', 'lost_at' => null, 'lost_reason' => null]);
+        }
     }
 
     public function dismissFollowup(LeadFollowup $followup): void

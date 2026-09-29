@@ -70,6 +70,10 @@ return [
         // Não sugere mais reabordagem nova depois de já ter tentado esse tanto de vezes.
         'max_attempts' => (int) env('WHATSAPP_FOLLOWUP_MAX_ATTEMPTS', 3),
 
+        // Quantos dias depois de marcado como perdido o App\Services\Leads\LostLeadReconnector
+        // tenta reconectar de novo (ninguém fica de fora, nem quem já disse que não queria nada).
+        'lost_reconnect_after_days' => (int) env('WHATSAPP_FOLLOWUP_LOST_RECONNECT_AFTER_DAYS', 5),
+
         // Se a última mensagem do cliente for só uma dessas (sem acento/pontuação, minúsculas),
         // a conversa é tratada como encerrada, não como "sem resposta".
         'closing_phrases' => [

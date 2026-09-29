@@ -4,8 +4,8 @@ namespace App\Services\Whatsapp;
 
 use App\Models\Customer;
 use App\Models\Lead;
-use App\Models\LeadFollowup;
 use App\Models\WhatsappChat;
+use App\Services\Leads\FollowupGate;
 use Carbon\CarbonImmutable;
 
 /**
@@ -20,6 +20,8 @@ class StalledConversationDetector
 
     // Nós (ou o bot) respondemos por último e o cliente não voltou a escrever.
     public const REASON_CUSTOMER_SILENT = 'customer_silent';
+
+    public function __construct(private readonly FollowupGate $gate) {}
 
     /** @return array{leads_created: int, followups_created: int, chats_skipped: int} */
     public function detect(?int $storeId = null): array
@@ -143,37 +145,6 @@ class StalledConversationDetector
             return false;
         }
 
-        $attempts = $lead->followups()->where('type', 'recover')->count();
-
-        if ($attempts >= $config['max_attempts']) {
-            return false;
-        }
-
-        $openExists = $lead->followups()
-            ->whereIn('status', ['candidate', 'draft_ready', 'approved'])
-            ->exists();
-
-        if ($openExists) {
-            return false;
-        }
-
-        $inCooldown = $lead->followups()
-            ->whereIn('status', ['dismissed', 'sent'])
-            ->where('updated_at', '>=', CarbonImmutable::now()->subDays($config['cooldown_days']))
-            ->exists();
-
-        if ($inCooldown) {
-            return false;
-        }
-
-        LeadFollowup::create([
-            'lead_id' => $lead->id,
-            'type' => 'recover',
-            'reason' => $reason,
-            'status' => 'candidate',
-            'suggested_by' => 'rules',
-        ]);
-
-        return true;
+        return $this->gate->createIfAllowed($lead, 'recover', $reason, $config['cooldown_days'], $config['max_attempts']);
     }
 }
