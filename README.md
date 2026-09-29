@@ -143,7 +143,7 @@ php artisan whatsapp:followups:review <id> approve|dismiss --user=<id>
 Quem comprou (`status=won`) nunca é excluído: fica `WHATSAPP_FOLLOWUP_RETENTION_DAYS` (padrão 30
 dias) disponível para pós-venda antes de `whatsapp:leads:archive` marcar como arquivado.
 
-`whatsapp:leads:detect` roda sozinho, de hora em hora (`routes/console.php`), pelo serviço
+`whatsapp:leads:detect` roda sozinho, uma vez por dia às 18h (`routes/console.php`), pelo serviço
 `scheduler` do `docker-compose.yml` — um contêiner que fica chamando `php artisan schedule:run`
 a cada minuto, para não depender de cron no WSL (que não persiste entre reinícios). Só funciona
 enquanto o Docker estiver de pé (`sail up -d`); `docker logs centercorp-scheduler-1` mostra o que
