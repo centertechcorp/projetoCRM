@@ -24,6 +24,26 @@ services:
             - sail
         depends_on:
             - pgsql
+    # Roda `php artisan schedule:run` a cada minuto, para o whatsapp:leads:detect (agendado
+    # em routes/console.php) executar sozinho enquanto o Docker estiver de pé — sem depender
+    # de cron no WSL, que não persiste entre reinícios.
+    scheduler:
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.5
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: sail-8.5/app
+        entrypoint: ['sh', '-c', 'while true; do php artisan schedule:run --no-interaction; sleep 60; done']
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
     pgsql:
         image: 'postgres:18-alpine'
         ports:
