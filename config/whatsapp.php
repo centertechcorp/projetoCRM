@@ -56,13 +56,13 @@ return [
 
     'followup' => [
         // Só considera "parada" depois de tantas horas sem mensagem nova.
-        'min_idle_hours' => (int) env('WHATSAPP_FOLLOWUP_MIN_IDLE_HOURS', 24),
+        'min_idle_hours' => (int) env('WHATSAPP_FOLLOWUP_MIN_IDLE_HOURS', 12),
 
         // Conversas mais antigas que isso não geram mais follow-up novo (só o que já existe).
-        'max_age_days' => (int) env('WHATSAPP_FOLLOWUP_MAX_AGE_DAYS', 30),
+        'max_age_days' => (int) env('WHATSAPP_FOLLOWUP_MAX_AGE_DAYS', 15),
 
         // Não gera um follow-up novo para a mesma conversa antes desse intervalo.
-        'cooldown_days' => (int) env('WHATSAPP_FOLLOWUP_COOLDOWN_DAYS', 14),
+        'cooldown_days' => (int) env('WHATSAPP_FOLLOWUP_COOLDOWN_DAYS', 10),
 
         // Por quantos dias um lead "comprou" fica visível no pós-venda antes de arquivar.
         'retention_days' => (int) env('WHATSAPP_FOLLOWUP_RETENTION_DAYS', 30),
