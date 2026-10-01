@@ -93,12 +93,14 @@ class PainelTest extends TestCase
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $user = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'manager', null, canDecide: false);
-        $this->makeLead($store, 'Cliente', '5534999990030');
+        $lead = $this->makeLead($store, 'Cliente', '5534999990030');
 
         $response = $this->actingAs($user)->get('/painel?tab=ongoing');
 
-        $response->assertDontSee('Aprovar');
-        $response->assertDontSee('Comprou');
+        // Checa a URL do form, não a palavra solta — "Aprovar"/"Comprou" também aparecem
+        // no texto explicativo "Como funciona", que é visível pra todo mundo.
+        $response->assertDontSee(route('painel.leads.won', $lead));
+        $response->assertDontSee(route('painel.leads.lost', $lead));
     }
 
     public function test_user_without_can_decide_is_forbidden_from_every_decision(): void

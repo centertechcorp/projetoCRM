@@ -28,6 +28,8 @@
 @endphp
 
 @section('content')
+@include('painel.partials.business-rules')
+
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
     <nav class="flex flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm">
         @foreach ($tabs as $t)
