@@ -38,18 +38,25 @@
         @endforeach
     </nav>
 
-    @if ($stores->isNotEmpty())
-        <form method="GET" class="text-sm">
-            <input type="hidden" name="tab" value="{{ $tab }}">
-            <select name="store" onchange="this.form.submit()"
-                class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
-                <option value="">Todas as lojas</option>
-                @foreach ($stores as $store)
-                    <option value="{{ $store->id }}" @selected((string) $selectedStore === (string) $store->id)>{{ $store->code }}</option>
-                @endforeach
-            </select>
-        </form>
-    @endif
+    <div class="flex items-center gap-2">
+        <a href="{{ route('painel.report', ['store' => $selectedStore]) }}"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Relatório do dia
+        </a>
+
+        @if ($stores->isNotEmpty())
+            <form method="GET" class="text-sm">
+                <input type="hidden" name="tab" value="{{ $tab }}">
+                <select name="store" onchange="this.form.submit()"
+                    class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+                    <option value="">Todas as lojas</option>
+                    @foreach ($stores as $store)
+                        <option value="{{ $store->id }}" @selected((string) $selectedStore === (string) $store->id)>{{ $store->code }}</option>
+                    @endforeach
+                </select>
+            </form>
+        @endif
+    </div>
 </div>
 
 @if ($leads->isEmpty())

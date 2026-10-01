@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Painel\PainelController;
+use App\Http\Controllers\Painel\PainelReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,4 +22,5 @@ Route::middleware('auth')->group(function () {
     Route::post('/painel/followups/{followup}/dismiss', [PainelController::class, 'dismissFollowup'])->name('painel.followups.dismiss');
     Route::post('/painel/leads/{lead}/won', [PainelController::class, 'markWon'])->name('painel.leads.won');
     Route::post('/painel/leads/{lead}/lost', [PainelController::class, 'markLost'])->name('painel.leads.lost');
+    Route::get('/painel/relatorio', [PainelReportController::class, 'index'])->name('painel.report');
 });
