@@ -82,6 +82,14 @@ return [
             'entendi', 'certo', 'tranquilo', 'tudo bem',
             '👍', '👍🏻', '👍🏼', '👍🏽', '👍🏾', '👍🏿',
         ],
+
+        // Números que nunca viram lead, mesmo se a conversa parar — telefone do dono/equipe
+        // usado pra testar a extensão, não é cliente de verdade. Mesmo formato de
+        // customers.phone (só dígitos, com DDI). Lista separada por vírgula.
+        'excluded_phones' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('WHATSAPP_FOLLOWUP_EXCLUDED_PHONES', '5534999748837'))
+        ))),
     ],
 
     /*

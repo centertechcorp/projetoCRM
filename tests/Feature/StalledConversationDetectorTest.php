@@ -62,6 +62,20 @@ class StalledConversationDetectorTest extends TestCase
         $this->assertSame(StalledConversationDetector::REASON_CUSTOMER_SILENT, LeadFollowup::sole()->reason);
     }
 
+    public function test_ignores_excluded_phones(): void
+    {
+        config(['whatsapp.followup.excluded_phones' => ['5534999990001']]);
+
+        $this->chat('5534999990001', [['in', -48]]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(0, $result['leads_created']);
+        $this->assertSame(0, $result['followups_created']);
+        $this->assertSame(0, Lead::count());
+        $this->assertSame(0, Customer::count());
+    }
+
     public function test_ignores_group_chats(): void
     {
         $chat = WhatsappChat::create([

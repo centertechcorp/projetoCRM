@@ -90,7 +90,7 @@ class StalledConversationDetector
     {
         $phone = PhoneNormalizer::normalize($chat->phone ?? $chat->chat_key);
 
-        if ($phone === null) {
+        if ($phone === null || in_array($phone, config('whatsapp.followup.excluded_phones', []), true)) {
             return null;
         }
 
