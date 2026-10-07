@@ -51,6 +51,20 @@ Configure em `.env`: `WHATSAPP_TOKEN` (obrigatório; o mesmo token vai nas opç�
 do Sail é preciso `--host=0.0.0.0` e publicar a porta no `docker-compose.yml`. A instalação da
 extensão está em `whatsapp-extension/README.md`.
 
+### Depois de uma queda (restart / recovery)
+
+1. `./vendor/bin/sail up -d` — sobe Postgres, app e scheduler.
+2. No host (não no Sail), em modo `--database`: `DB_HOST=127.0.0.1 php artisan whatsapp:listen
+   --database`. O `DB_HOST=pgsql` do `.env` é só pro app/scheduler de dentro do Sail; de fora
+   (no host) o nome `pgsql` não resolve, por isso o override na hora de rodar. Sem `--database`
+   (grava só em `.txt`), não precisa do `DB_HOST` nem de banco: `php artisan whatsapp:listen`.
+3. Se o Chrome tiver sido fechado, reabra os perfis (CENTER/GENIUS): o WhatsApp Web reconecta
+   sozinho, sem pedir QR code de novo e sem precisar reconfigurar token.
+4. Se o Chrome ficou aberto o tempo todo (só Docker/daemon caíram), não precisa fazer nada na
+   extensão: ela guarda localmente (fila em `chrome.storage.local`, com retry automático a cada
+   1 minuto — ver `whatsapp-extension/background.js`) o que não conseguiu entregar, e reenvia
+   sozinha quando o `/health` do daemon voltar a responder.
+
 ### Mensagens do WhatsApp no banco
 
 Com `WHATSAPP_DATABASE=true` (ou `php artisan whatsapp:listen --database`) o daemon grava também no

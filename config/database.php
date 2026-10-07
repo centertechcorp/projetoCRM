@@ -84,6 +84,22 @@ return [
             ]) : [],
         ],
 
+        // Banco do fornecedor (Mix Atacado) — só leitura, pra consultar preço/estoque de
+        // peças. Nunca escreve nada aqui, é a base deles, não a nossa.
+        'mix_atacado' => [
+            'driver' => 'mariadb',
+            'host' => env('MIX_ATACADO_DB_HOST'),
+            'port' => env('MIX_ATACADO_DB_PORT', '3306'),
+            'database' => env('MIX_ATACADO_DB_DATABASE'),
+            'username' => env('MIX_ATACADO_DB_USERNAME'),
+            'password' => env('MIX_ATACADO_DB_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+            'engine' => null,
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

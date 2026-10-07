@@ -67,9 +67,19 @@ class MessageRecorder
             return self::DUPLICATE;
         }
 
-        DB::transaction(function () use ($account, $message, $source, $payload, $chatKey): void {
+        $result = self::STORED;
+
+        DB::transaction(function () use ($account, $message, $source, $payload, $chatKey, &$result): void {
             $sentAt = CarbonImmutable::createFromTimestamp($message->timestamp);
             $chat = $this->chatFor($account, $message, $chatKey, $sentAt);
+
+            // Mesma regra do grupo: chat marcado como ignorado (whatsapp:chats:ignore) não
+            // grava mensagem nova de conversa individual também — antes só valia pra grupo.
+            if ($chat->ignored) {
+                $result = self::IGNORED;
+
+                return;
+            }
 
             $stored = WhatsappMessage::create([
                 'whatsapp_account_id' => $account->id,
@@ -98,7 +108,7 @@ class MessageRecorder
             }
         });
 
-        return self::STORED;
+        return $result;
     }
 
     /**

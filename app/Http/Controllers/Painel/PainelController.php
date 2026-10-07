@@ -7,7 +7,11 @@ use App\Models\Lead;
 use App\Models\LeadFollowup;
 use App\Models\Store;
 use App\Services\Leads\LeadDecisionService;
+use App\Services\Leads\LeadPriorityScorer;
+use App\Services\Market\ExchangeRateService;
+use App\Services\Market\SupplierPartsService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,21 +24,32 @@ class PainelController extends Controller
 
     private const TABS = ['ongoing', 'reconnect', 'won', 'lost', 'all'];
 
-    public function index(Request $request): View
+    public function index(Request $request, LeadPriorityScorer $scorer, ExchangeRateService $exchangeRate, SupplierPartsService $parts): View
     {
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'reconnect';
         $user = $request->user();
 
         $storeId = $user->isSeller() ? $user->store_id : $request->query('store');
+        $search = trim((string) $request->query('search'));
 
         $leads = $this->scopeTab(Lead::query(), $tab)
-            ->with(['customer', 'store', 'followups' => fn ($q) => $q->latest()])
+            ->with(['customer', 'store', 'chat', 'followups' => fn ($q) => $q->latest()])
             ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->when($search !== '', fn ($q) => $this->scopeSearch($q, $search))
             ->orderByDesc('last_contact_at')
             ->get();
 
+        // Na aba de reconectar, quem tem mais sinal de interesse real (pergunta de
+        // fechamento, orçamento já dado, engajamento) vem primeiro, não só o mais recente.
+        if ($tab === 'reconnect') {
+            $leads = $leads->sortByDesc(fn (Lead $lead) => $scorer->score($lead))->values();
+        }
+
         $counts = collect(self::TABS)->mapWithKeys(fn ($t) => [
-            $t => $this->scopeTab(Lead::query(), $t)->when($storeId, fn ($q) => $q->where('store_id', $storeId))->count(),
+            $t => $this->scopeTab(Lead::query(), $t)
+                ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+                ->when($search !== '', fn ($q) => $this->scopeSearch($q, $search))
+                ->count(),
         ]);
 
         return view('painel.index', [
@@ -44,8 +59,24 @@ class PainelController extends Controller
             'counts' => $counts,
             'stores' => $user->isSeller() ? collect() : Store::orderBy('name')->get(),
             'selectedStore' => $storeId,
+            'search' => $search,
             'canDecide' => (bool) $user->can_decide,
+            'usdBrl' => $exchangeRate->usdToBrl(),
+            'partsByCategory' => $parts->summaryByCategory(),
         ]);
+    }
+
+    public function partsSearch(Request $request, SupplierPartsService $parts, ExchangeRateService $exchangeRate): JsonResponse
+    {
+        $term = trim((string) $request->query('q'));
+        $usdBrl = $exchangeRate->usdToBrl();
+
+        $results = $parts->search($term)->map(fn ($item) => [
+            ...$item,
+            'valor_venda_usd' => $usdBrl ? round($item['valor_venda'] / $usdBrl['bid'], 2) : null,
+        ]);
+
+        return response()->json(['results' => $results->values()]);
     }
 
     /** @param  Builder<Lead>  $query */
@@ -61,40 +92,76 @@ class PainelController extends Controller
         };
     }
 
-    public function approveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse
+    /** @param  Builder<Lead>  $query */
+    private function scopeSearch($query, string $term)
+    {
+        // ilike (não like): Postgres é case-sensitive por padrão em LIKE.
+        return $query->where(fn (Builder $q) => $q
+            ->whereHas('customer', fn ($c) => $c->where('name', 'ilike', "%{$term}%")
+                ->orWhere('phone', 'ilike', "%{$term}%"))
+            ->orWhere('product_interest', 'ilike', "%{$term}%"));
+    }
+
+    public function approveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse
     {
         $this->authorizeLead($request, $followup->lead);
 
         $decisions->approveFollowup($followup, $request->user());
 
-        return back()->with('status', 'Sugestão aprovada.');
+        $storeCode = $followup->lead->store->code;
+
+        return $this->respond($request, $followup->lead, "Sugestão aprovada. Copie o link do WhatsApp e cole na janela do Chrome da loja {$storeCode}.");
     }
 
-    public function dismissFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse
+    public function dismissFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse
     {
         $this->authorizeLead($request, $followup->lead);
 
         $decisions->dismissFollowup($followup);
 
-        return back()->with('status', 'Sugestão descartada.');
+        return $this->respond($request, $followup->lead, 'Sugestão descartada.');
     }
 
-    public function markWon(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse
+    public function unapproveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse
+    {
+        $this->authorizeLead($request, $followup->lead);
+
+        $decisions->unapproveFollowup($followup);
+
+        return $this->respond($request, $followup->lead, 'Aprovação desfeita.');
+    }
+
+    public function markWon(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse|JsonResponse
     {
         $this->authorizeLead($request, $lead);
 
         $decisions->closeLeadWon($lead);
 
-        return back()->with('status', 'Lead marcado como vendido.');
+        return $this->respond($request, $lead, 'Lead marcado como vendido.');
     }
 
-    public function markLost(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse
+    public function markLost(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse|JsonResponse
     {
         $this->authorizeLead($request, $lead);
 
         $decisions->closeLeadLost($lead, $request->string('reason')->trim()->value() ?: null);
 
-        return back()->with('status', 'Lead marcado como perdido.');
+        return $this->respond($request, $lead, 'Lead marcado como perdido.');
+    }
+
+    private function respond(Request $request, Lead $lead, string $message): RedirectResponse|JsonResponse
+    {
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'row' => view('painel.partials.lead-row', [
+                    'lead' => $lead->fresh(['customer', 'store', 'chat', 'followups' => fn ($q) => $q->latest()]),
+                    'canDecide' => (bool) $request->user()->can_decide,
+                ])->render(),
+            ]);
+        }
+
+        return back()->with('status', $message);
     }
 
     private function authorizeLead(Request $request, Lead $lead): void

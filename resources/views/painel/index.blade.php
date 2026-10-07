@@ -10,45 +10,111 @@
         'lost' => 'Desistiu',
         'all' => 'Todos',
     ];
-    $statusBadge = [
-        'open' => 'bg-amber-100 text-amber-800',
-        'won' => 'bg-emerald-100 text-emerald-800',
-        'lost' => 'bg-slate-200 text-slate-600',
-    ];
-    $statusLabel = [
-        'open' => 'Aberto',
-        'won' => 'Vendido',
-        'lost' => 'Perdido',
-    ];
-    $reasonLabel = [
-        'customer_unanswered' => 'Cliente sem resposta',
-        'customer_silent' => 'Cliente sumiu',
-        'purchase' => 'Pós-venda',
-    ];
 @endphp
 
 @section('content')
+@if ($usdBrl)
+    <div class="mb-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <span class="text-lg">💵</span>
+        <div>
+            <span class="font-medium text-slate-900 dark:text-slate-100">Dólar: R$ {{ number_format($usdBrl['bid'], 2, ',', '.') }}</span>
+            <span class="ml-1 {{ $usdBrl['pct_change'] >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' }}">
+                {{ $usdBrl['pct_change'] >= 0 ? '▲' : '▼' }} {{ number_format(abs($usdBrl['pct_change']), 2, ',', '.') }}%
+            </span>
+        </div>
+    </div>
+@endif
+
+@if ($partsByCategory)
+    <div class="mb-4 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <span class="font-medium text-slate-900 dark:text-slate-100">🔧 Peças (Mix Atacado)</span>
+            <input type="search" id="partsSearchInput" placeholder="Buscar peça (ex: iphone 13)" autocomplete="off"
+                class="w-64 rounded-lg border border-slate-300 px-3 py-1 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500">
+        </div>
+
+        <div id="partsSearchResults" class="hidden mb-2 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 text-xs dark:divide-slate-800 dark:border-slate-700"></div>
+
+        <details id="partsSummaryTable">
+            <summary class="cursor-pointer select-none text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
+                Ver tabela de preços
+            </summary>
+
+            <div class="mt-2 flex items-center justify-center gap-3">
+                <button type="button" id="partsPrevCategory" aria-label="Categoria anterior"
+                    class="flex h-7 w-16 items-center justify-center rounded-full border border-slate-300 text-base leading-none text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">‹</button>
+                <span id="partsCategoryLabel" class="min-w-[9rem] text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"></span>
+                <button type="button" id="partsNextCategory" aria-label="Próxima categoria"
+                    class="flex h-7 w-16 items-center justify-center rounded-full border border-slate-300 text-base leading-none text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">›</button>
+            </div>
+
+            @foreach ($partsByCategory as $categoria => $linhas)
+                <div class="parts-category-page {{ $loop->first ? '' : 'hidden' }} mt-2 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800" data-category="{{ $categoria }}">
+                    <table class="min-w-full text-xs">
+                        <thead class="bg-slate-50 text-left font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            <tr>
+                                <th class="px-4 py-1">Marca</th>
+                                <th class="px-4 py-1">Qtd</th>
+                                <th class="px-4 py-1">R$</th>
+                                <th class="px-4 py-1">US$</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                            @foreach ($linhas as $row)
+                                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                    <td class="px-4 py-1">
+                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $row['marca'] }}</span>
+                                    </td>
+                                    <td class="px-4 py-1 text-slate-500 dark:text-slate-400">{{ $row['qtd'] }}</td>
+                                    <td class="px-4 py-1 font-medium text-slate-900 dark:text-slate-100">
+                                        R$ {{ number_format($row['min'], 2, ',', '.') }}@if ($row['min'] != $row['max']) <span class="text-slate-400 dark:text-slate-500">–</span> {{ number_format($row['max'], 2, ',', '.') }}@endif
+                                    </td>
+                                    <td class="px-4 py-1 text-slate-500 dark:text-slate-400">
+                                        @if ($usdBrl)
+                                            US$ {{ number_format($row['min'] / $usdBrl['bid'], 2, ',', '.') }}@if ($row['min'] != $row['max']) – {{ number_format($row['max'] / $usdBrl['bid'], 2, ',', '.') }}@endif
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endforeach
+        </details>
+    </div>
+@endif
+
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-    <nav class="flex flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm">
+    <nav class="flex flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm dark:bg-slate-800/60">
         @foreach ($tabs as $t)
-            <a href="{{ route('painel.index', ['tab' => $t, 'store' => $selectedStore]) }}"
-                class="rounded-md px-3 py-1.5 font-medium {{ $tab === $t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900' }}">
-                {{ $tabLabel[$t] }} <span class="text-slate-400">({{ $counts[$t] }})</span>
+            <a href="{{ route('painel.index', ['tab' => $t, 'store' => $selectedStore, 'search' => $search]) }}"
+                class="rounded-md px-3 py-1.5 font-medium {{ $tab === $t ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100' }}">
+                {{ $tabLabel[$t] }} <span class="text-slate-400 dark:text-slate-500">({{ $counts[$t] }})</span>
             </a>
         @endforeach
     </nav>
 
     <div class="flex items-center gap-2">
+        <form method="GET" class="text-sm">
+            <input type="hidden" name="tab" value="{{ $tab }}">
+            <input type="hidden" name="store" value="{{ $selectedStore }}">
+            <input type="search" name="search" id="leadSearchInput" value="{{ $search }}" placeholder="Nome, telefone ou produto/orçamento"
+                class="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500" autocomplete="off">
+        </form>
+
         <a href="{{ route('painel.report', ['store' => $selectedStore]) }}"
-            class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
             Relatório do dia
         </a>
 
         @if ($stores->isNotEmpty())
             <form method="GET" class="text-sm">
                 <input type="hidden" name="tab" value="{{ $tab }}">
+                <input type="hidden" name="search" value="{{ $search }}">
                 <select name="store" onchange="this.form.submit()"
-                    class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+                    class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                     <option value="">Todas as lojas</option>
                     @foreach ($stores as $store)
                         <option value="{{ $store->id }}" @selected((string) $selectedStore === (string) $store->id)>{{ $store->code }}</option>
@@ -60,13 +126,13 @@
 </div>
 
 @if ($leads->isEmpty())
-    <p class="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
+    <p class="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
         Nenhum lead nesta aba ainda.
     </p>
 @else
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
-            <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+            <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <tr>
                     <th class="px-4 py-3">Cliente</th>
                     <th class="px-4 py-3">Loja</th>
@@ -77,84 +143,9 @@
                     <th class="px-4 py-3">Ações</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                 @foreach ($leads as $lead)
-                    @php $followup = $lead->followups->first(); @endphp
-                    <tr class="align-top">
-                        <td class="px-4 py-3">
-                            <div class="font-medium text-slate-900">{{ $lead->customer->name ?: '(sem nome)' }}</div>
-                            <div class="text-slate-500">{{ $lead->customer->phone }}</div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="font-medium text-slate-900">{{ $lead->store->code }}</div>
-                            <span class="mt-1 inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium {{ $statusBadge[$lead->status] }}">
-                                {{ $statusLabel[$lead->status] ?? $lead->status }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div>{{ $lead->product_interest ?: '—' }}</div>
-                            @if ($lead->quoted_amount)
-                                <div class="text-slate-500">R$ {{ number_format($lead->quoted_amount, 2, ',', '.') }}</div>
-                            @endif
-                        </td>
-                        <td class="px-4 py-3 text-slate-500">
-                            {{ $lead->source }}@if ($lead->attended_by_label) · {{ $lead->attended_by_label }} @endif
-                        </td>
-                        <td class="px-4 py-3 text-slate-500">
-                            {{ $lead->next_contact_at?->format('d/m H:i') ?? '—' }}
-                        </td>
-                        <td class="px-4 py-3">
-                            @if ($followup)
-                                <div class="mb-1 text-xs font-medium text-slate-500">
-                                    {{ $reasonLabel[$followup->reason] ?? $followup->reason }} · {{ $followup->status }}
-                                </div>
-                                @if ($followup->suggested_message)
-                                    <p class="max-w-xs text-slate-700">{{ $followup->suggested_message }}</p>
-                                @else
-                                    <p class="max-w-xs italic text-slate-400">Sem rascunho ainda — escreva a mensagem você mesmo ao abrir o WhatsApp.</p>
-                                @endif
-                            @else
-                                <span class="text-slate-400">—</span>
-                            @endif
-                        </td>
-                        <td class="px-4 py-3">
-                            @if ($canDecide)
-                                <div class="flex flex-col gap-1.5">
-                                    @if ($followup && in_array($followup->status, ['candidate', 'draft_ready']))
-                                        <form method="POST" action="{{ route('painel.followups.approve', $followup) }}">
-                                            @csrf
-                                            <button class="w-full rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700">Aprovar</button>
-                                        </form>
-                                        <form method="POST" action="{{ route('painel.followups.dismiss', $followup) }}">
-                                            @csrf
-                                            <button class="w-full rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">Descartar</button>
-                                        </form>
-                                    @endif
-
-                                    @if ($followup && $followup->status === 'approved')
-                                        <a target="_blank" rel="noopener"
-                                            href="https://wa.me/{{ $lead->customer->phone }}{{ $followup->suggested_message ? '?text='.urlencode($followup->suggested_message) : '' }}"
-                                            class="rounded-md border border-emerald-300 px-2 py-1 text-center text-xs font-medium text-emerald-700 hover:bg-emerald-50">
-                                            Abrir no WhatsApp
-                                        </a>
-                                    @endif
-
-                                    @if ($lead->status === 'open')
-                                        <form method="POST" action="{{ route('painel.leads.won', $lead) }}">
-                                            @csrf
-                                            <button class="w-full rounded-md border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50">Comprou</button>
-                                        </form>
-                                        <form method="POST" action="{{ route('painel.leads.lost', $lead) }}">
-                                            @csrf
-                                            <button class="w-full rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">Perdeu</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            @else
-                                <span class="text-slate-400">—</span>
-                            @endif
-                        </td>
-                    </tr>
+                    @include('painel.partials.lead-row', ['lead' => $lead, 'canDecide' => $canDecide])
                 @endforeach
             </tbody>
         </table>
@@ -164,4 +155,206 @@
 <div class="mt-6">
     @include('painel.partials.business-rules')
 </div>
+
+<script>
+    let flashHideTimer = null;
+
+    (function () {
+        const input = document.getElementById('leadSearchInput');
+
+        if (!input) {
+            return;
+        }
+
+        input.addEventListener('input', function () {
+            const term = input.value.trim().toLowerCase();
+
+            document.querySelectorAll('[data-lead-search]').forEach(function (row) {
+                row.style.display = row.dataset.leadSearch.includes(term) ? '' : 'none';
+            });
+        });
+    })();
+
+    function bindCopyButtons(scope) {
+        scope.querySelectorAll('[data-copy-link]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                navigator.clipboard.writeText(button.dataset.copyLink).then(function () {
+                    const original = button.textContent;
+                    button.textContent = 'Copiado!';
+                    setTimeout(function () {
+                        button.textContent = original;
+                    }, 1500);
+
+                    const flash = document.getElementById('flashStatus');
+                    if (flash) {
+                        flash.textContent = 'Link copiado! Cole na janela do Chrome da loja ' + button.dataset.store + '.';
+                        flash.classList.remove('hidden');
+
+                        clearTimeout(flashHideTimer);
+                        flashHideTimer = setTimeout(function () {
+                            flash.classList.add('hidden');
+                        }, 20000);
+                    }
+                });
+            });
+        });
+    }
+
+    function showRowToast(row, message) {
+        const colCount = row.children.length;
+        const toastRow = document.createElement('tr');
+        toastRow.className = 'js-row-toast transition-opacity duration-500';
+        const td = document.createElement('td');
+        td.colSpan = colCount;
+        td.className = 'bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200';
+        td.textContent = message;
+        toastRow.appendChild(td);
+        row.parentNode.insertBefore(toastRow, row);
+
+        setTimeout(function () {
+            toastRow.style.opacity = '0';
+            setTimeout(function () {
+                toastRow.remove();
+            }, 500);
+        }, 5000);
+    }
+
+    function bindRowAction(form) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const row = form.closest('[data-lead-row]');
+            const leadId = row ? row.dataset.leadRow : null;
+
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: new FormData(form),
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (!row || !data.row) {
+                        return;
+                    }
+
+                    row.outerHTML = data.row;
+
+                    const newRow = document.querySelector('[data-lead-row="' + leadId + '"]');
+                    if (newRow) {
+                        bindCopyButtons(newRow);
+                        newRow.querySelectorAll('form.js-row-action').forEach(bindRowAction);
+
+                        if (data.message) {
+                            showRowToast(newRow, data.message);
+                        }
+                    }
+                });
+        });
+    }
+
+    bindCopyButtons(document);
+    document.querySelectorAll('form.js-row-action').forEach(bindRowAction);
+
+    (function () {
+        const input = document.getElementById('partsSearchInput');
+        const resultsBox = document.getElementById('partsSearchResults');
+        const summaryTable = document.getElementById('partsSummaryTable');
+
+        if (!input || !resultsBox || !summaryTable) {
+            return;
+        }
+
+        let debounceTimer = null;
+
+        function showSummary() {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+            summaryTable.classList.remove('hidden');
+        }
+
+        function renderResults(items) {
+            resultsBox.innerHTML = '';
+
+            if (items.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'px-3 py-2 text-slate-400 dark:text-slate-500';
+                empty.textContent = 'Nada encontrado.';
+                resultsBox.appendChild(empty);
+
+                return;
+            }
+
+            items.forEach(function (item) {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-3 px-3 py-1.5';
+
+                const name = document.createElement('span');
+                name.className = 'text-slate-700 dark:text-slate-300';
+                name.textContent = item.nome;
+
+                const price = document.createElement('span');
+                price.className = 'whitespace-nowrap text-slate-500 dark:text-slate-400';
+                const usd = item.valor_venda_usd !== null ? 'US$ ' + item.valor_venda_usd.toFixed(2).replace('.', ',') : '—';
+                price.textContent = 'R$ ' + item.valor_venda.toFixed(2).replace('.', ',') + ' · ' + usd;
+
+                row.appendChild(name);
+                row.appendChild(price);
+                resultsBox.appendChild(row);
+            });
+        }
+
+        input.addEventListener('input', function () {
+            const term = input.value.trim();
+            clearTimeout(debounceTimer);
+
+            if (term === '') {
+                showSummary();
+
+                return;
+            }
+
+            debounceTimer = setTimeout(function () {
+                fetch('{{ route('painel.parts.search') }}?q=' + encodeURIComponent(term))
+                    .then(function (response) { return response.json(); })
+                    .then(function (data) {
+                        summaryTable.classList.add('hidden');
+                        resultsBox.classList.remove('hidden');
+                        renderResults(data.results);
+                    });
+            }, 300);
+        });
+    })();
+
+    (function () {
+        const pages = Array.from(document.querySelectorAll('.parts-category-page'));
+        const label = document.getElementById('partsCategoryLabel');
+        const prevBtn = document.getElementById('partsPrevCategory');
+        const nextBtn = document.getElementById('partsNextCategory');
+
+        if (pages.length === 0 || !label || !prevBtn || !nextBtn) {
+            return;
+        }
+
+        let current = 0;
+
+        function render() {
+            pages.forEach(function (page, i) {
+                page.classList.toggle('hidden', i !== current);
+            });
+            label.textContent = pages[current].dataset.category + ' (' + (current + 1) + '/' + pages.length + ')';
+        }
+
+        prevBtn.addEventListener('click', function () {
+            current = (current - 1 + pages.length) % pages.length;
+            render();
+        });
+
+        nextBtn.addEventListener('click', function () {
+            current = (current + 1) % pages.length;
+            render();
+        });
+
+        render();
+    })();
+</script>
 @endsection

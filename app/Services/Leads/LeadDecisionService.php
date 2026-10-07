@@ -36,6 +36,15 @@ class LeadDecisionService
         $followup->update(['status' => 'dismissed', 'dismissed_at' => CarbonImmutable::now()]);
     }
 
+    public function unapproveFollowup(LeadFollowup $followup): void
+    {
+        $followup->update([
+            'status' => $followup->suggested_message ? 'draft_ready' : 'candidate',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+    }
+
     public function closeLeadWon(Lead $lead): void
     {
         $now = CarbonImmutable::now();

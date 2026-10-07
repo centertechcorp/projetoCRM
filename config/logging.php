@@ -131,6 +131,14 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        // Etapa 1 do teste do WAHA: só grava o que chega no webhook, sem tocar no banco.
+        'waha_test' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/waha-test.log'),
+            'level' => 'debug',
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
