@@ -55,7 +55,7 @@ class PainelReportController extends Controller
             'messages' => $messages,
             'conversations' => $conversations,
             'summary' => $summary,
-            'stores' => $user->isSeller() ? collect() : Store::orderBy('name')->get(),
+            'stores' => $user->isSeller() ? collect() : Store::where('code', '!=', 'MIXCELL')->orderBy('name')->get(),
             'selectedStore' => $storeId,
             'search' => $search,
         ]);

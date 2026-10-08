@@ -13,18 +13,6 @@
 @endphp
 
 @section('content')
-@if ($usdBrl)
-    <div class="mb-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <span class="text-lg">💵</span>
-        <div>
-            <span class="font-medium text-slate-900 dark:text-slate-100">Dólar: R$ {{ number_format($usdBrl['bid'], 2, ',', '.') }}</span>
-            <span class="ml-1 {{ $usdBrl['pct_change'] >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' }}">
-                {{ $usdBrl['pct_change'] >= 0 ? '▲' : '▼' }} {{ number_format(abs($usdBrl['pct_change']), 2, ',', '.') }}%
-            </span>
-        </div>
-    </div>
-@endif
-
 @if ($partsByCategory)
     <div class="mb-4 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -54,9 +42,8 @@
                         <thead class="bg-slate-50 text-left font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                             <tr>
                                 <th class="px-4 py-1">Marca</th>
-                                <th class="px-4 py-1">Qtd</th>
-                                <th class="px-4 py-1">R$</th>
-                                <th class="px-4 py-1">US$</th>
+                                <th class="py-1 pl-[5.5rem] pr-4 text-center">Qtd</th>
+                                <th class="px-4 py-1 text-right">R$</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
@@ -65,16 +52,9 @@
                                     <td class="px-4 py-1">
                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $row['marca'] }}</span>
                                     </td>
-                                    <td class="px-4 py-1 text-slate-500 dark:text-slate-400">{{ $row['qtd'] }}</td>
-                                    <td class="px-4 py-1 font-medium text-slate-900 dark:text-slate-100">
+                                    <td class="py-1 pl-[5.5rem] pr-4 text-center text-slate-500 dark:text-slate-400">{{ $row['qtd'] }}</td>
+                                    <td class="px-4 py-1 text-right font-medium text-slate-900 dark:text-slate-100">
                                         R$ {{ number_format($row['min'], 2, ',', '.') }}@if ($row['min'] != $row['max']) <span class="text-slate-400 dark:text-slate-500">–</span> {{ number_format($row['max'], 2, ',', '.') }}@endif
-                                    </td>
-                                    <td class="px-4 py-1 text-slate-500 dark:text-slate-400">
-                                        @if ($usdBrl)
-                                            US$ {{ number_format($row['min'] / $usdBrl['bid'], 2, ',', '.') }}@if ($row['min'] != $row['max']) – {{ number_format($row['max'] / $usdBrl['bid'], 2, ',', '.') }}@endif
-                                        @else
-                                            —
-                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -89,7 +69,7 @@
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
     <nav class="flex flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm dark:bg-slate-800/60">
         @foreach ($tabs as $t)
-            <a href="{{ route('painel.index', ['tab' => $t, 'store' => $selectedStore, 'search' => $search]) }}"
+            <a href="{{ route('painel.index', ['tab' => $t, 'store' => $selectedStore, 'search' => $search, 'priority' => $priority]) }}"
                 class="rounded-md px-3 py-1.5 font-medium {{ $tab === $t ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100' }}">
                 {{ $tabLabel[$t] }} <span class="text-slate-400 dark:text-slate-500">({{ $counts[$t] }})</span>
             </a>
@@ -100,6 +80,7 @@
         <form method="GET" class="text-sm">
             <input type="hidden" name="tab" value="{{ $tab }}">
             <input type="hidden" name="store" value="{{ $selectedStore }}">
+            <input type="hidden" name="priority" value="{{ $priority }}">
             <input type="search" name="search" id="leadSearchInput" value="{{ $search }}" placeholder="Nome, telefone ou produto/orçamento"
                 class="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500" autocomplete="off">
         </form>
@@ -113,6 +94,7 @@
             <form method="GET" class="text-sm">
                 <input type="hidden" name="tab" value="{{ $tab }}">
                 <input type="hidden" name="search" value="{{ $search }}">
+                <input type="hidden" name="priority" value="{{ $priority }}">
                 <select name="store" onchange="this.form.submit()"
                     class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                     <option value="">Todas as lojas</option>
@@ -125,6 +107,22 @@
     </div>
 </div>
 
+<div class="mb-4 flex items-center gap-2">
+    <form method="GET" class="flex items-center gap-2 text-sm">
+        <input type="hidden" name="tab" value="{{ $tab }}">
+        <input type="hidden" name="store" value="{{ $selectedStore }}">
+        <input type="hidden" name="search" value="{{ $search }}">
+        <label for="priorityFilter" class="font-medium text-slate-600 dark:text-slate-400">Prioridade:</label>
+        <select name="priority" id="priorityFilter" onchange="this.form.submit()"
+            class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <option value="">Todas as prioridades</option>
+            <option value="alta" @selected($priority === 'alta')>🔥 Alta</option>
+            <option value="media" @selected($priority === 'media')>🟡 Média</option>
+            <option value="baixa" @selected($priority === 'baixa')>⚪ Baixa</option>
+        </select>
+    </form>
+</div>
+
 @if ($leads->isEmpty())
     <p class="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
         Nenhum lead nesta aba ainda.
@@ -134,13 +132,13 @@
         <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
             <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <tr>
-                    <th class="px-4 py-3">Cliente</th>
-                    <th class="px-4 py-3">Loja</th>
-                    <th class="px-4 py-3">Produto / Orçamento</th>
-                    <th class="px-4 py-3">Origem · Atendente</th>
-                    <th class="px-4 py-3">Próximo contato</th>
-                    <th class="px-4 py-3">Sugestão de reabordagem</th>
-                    <th class="px-4 py-3">Ações</th>
+                    <th class="px-4 py-1.5">Cliente</th>
+                    <th class="px-4 py-1.5">Loja</th>
+                    <th class="px-4 py-1.5">Produto / Orçamento</th>
+                    <th class="px-4 py-1.5">Origem · Atendente</th>
+                    <th class="px-4 py-1.5">Próximo contato</th>
+                    <th class="px-4 py-1.5">Sugestão de reabordagem</th>
+                    <th class="px-4 py-1.5">Ações</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -294,8 +292,7 @@
 
                 const price = document.createElement('span');
                 price.className = 'whitespace-nowrap text-slate-500 dark:text-slate-400';
-                const usd = item.valor_venda_usd !== null ? 'US$ ' + item.valor_venda_usd.toFixed(2).replace('.', ',') : '—';
-                price.textContent = 'R$ ' + item.valor_venda.toFixed(2).replace('.', ',') + ' · ' + usd;
+                price.textContent = 'R$ ' + item.valor_venda.toFixed(2).replace('.', ',');
 
                 row.appendChild(name);
                 row.appendChild(price);

@@ -8,7 +8,6 @@ use App\Models\LeadFollowup;
 use App\Models\Store;
 use App\Services\Leads\LeadDecisionService;
 use App\Services\Leads\LeadPriorityScorer;
-use App\Services\Market\ExchangeRateService;
 use App\Services\Market\SupplierPartsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -24,13 +23,21 @@ class PainelController extends Controller
 
     private const TABS = ['ongoing', 'reconnect', 'won', 'lost', 'all'];
 
-    public function index(Request $request, LeadPriorityScorer $scorer, ExchangeRateService $exchangeRate, SupplierPartsService $parts): View
+    /** Valor do filtro ?priority= => rótulo que LeadPriorityScorer::label() devolve. */
+    private const PRIORITY_LABELS = ['alta' => 'Alta', 'media' => 'Média', 'baixa' => 'Baixa'];
+
+    public function index(Request $request, LeadPriorityScorer $scorer, SupplierPartsService $parts): View
     {
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'reconnect';
         $user = $request->user();
 
         $storeId = $user->isSeller() ? $user->store_id : $request->query('store');
         $search = trim((string) $request->query('search'));
+        $priority = (string) $request->query('priority', '');
+
+        if (! isset(self::PRIORITY_LABELS[$priority])) {
+            $priority = '';
+        }
 
         $leads = $this->scopeTab(Lead::query(), $tab)
             ->with(['customer', 'store', 'chat', 'followups' => fn ($q) => $q->latest()])
@@ -38,6 +45,13 @@ class PainelController extends Controller
             ->when($search !== '', fn ($q) => $this->scopeSearch($q, $search))
             ->orderByDesc('last_contact_at')
             ->get();
+
+        // Filtro de prioridade (Alta/Média/Baixa) é calculado por regra, não dá pra fazer
+        // em SQL — filtra em cima da coleção já carregada.
+        if ($priority !== '') {
+            $leads = $leads->filter(fn (Lead $lead) => $lead->status === 'open'
+                && $scorer->label($scorer->score($lead)) === self::PRIORITY_LABELS[$priority])->values();
+        }
 
         // Na aba de reconectar, quem tem mais sinal de interesse real (pergunta de
         // fechamento, orçamento já dado, engajamento) vem primeiro, não só o mais recente.
@@ -57,26 +71,20 @@ class PainelController extends Controller
             'tab' => $tab,
             'tabs' => self::TABS,
             'counts' => $counts,
-            'stores' => $user->isSeller() ? collect() : Store::orderBy('name')->get(),
+            'stores' => $user->isSeller() ? collect() : Store::where('code', '!=', 'MIXCELL')->orderBy('name')->get(),
             'selectedStore' => $storeId,
             'search' => $search,
+            'priority' => $priority,
             'canDecide' => (bool) $user->can_decide,
-            'usdBrl' => $exchangeRate->usdToBrl(),
             'partsByCategory' => $parts->summaryByCategory(),
         ]);
     }
 
-    public function partsSearch(Request $request, SupplierPartsService $parts, ExchangeRateService $exchangeRate): JsonResponse
+    public function partsSearch(Request $request, SupplierPartsService $parts): JsonResponse
     {
         $term = trim((string) $request->query('q'));
-        $usdBrl = $exchangeRate->usdToBrl();
 
-        $results = $parts->search($term)->map(fn ($item) => [
-            ...$item,
-            'valor_venda_usd' => $usdBrl ? round($item['valor_venda'] / $usdBrl['bid'], 2) : null,
-        ]);
-
-        return response()->json(['results' => $results->values()]);
+        return response()->json(['results' => $parts->search($term)->values()]);
     }
 
     /** @param  Builder<Lead>  $query */
