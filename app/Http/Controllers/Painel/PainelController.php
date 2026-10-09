@@ -127,7 +127,7 @@ class PainelController extends Controller
 
         $decisions->dismissFollowup($followup);
 
-        return $this->respond($request, $followup->lead, 'Sugestão descartada.');
+        return $this->respond($request, $followup->lead, 'Lead separado — volta pra "Em andamento".');
     }
 
     public function unapproveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse
@@ -155,6 +155,21 @@ class PainelController extends Controller
         $decisions->closeLeadLost($lead, $request->string('reason')->trim()->value() ?: null);
 
         return $this->respond($request, $lead, 'Lead marcado como perdido.');
+    }
+
+    public function destroy(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse|JsonResponse
+    {
+        $this->authorizeLead($request, $lead);
+
+        $decisions->deletePermanently($lead);
+
+        $message = 'Contato removido — marcado pra nunca mais virar lead.';
+
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true, 'message' => $message]);
+        }
+
+        return back()->with('status', $message);
     }
 
     private function respond(Request $request, Lead $lead, string $message): RedirectResponse|JsonResponse

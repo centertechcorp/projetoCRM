@@ -28,3 +28,4 @@ Thumbs.db
 /venda.json
 # Chaves/senhas reais do WAHA em texto puro, não é pra versionar.
 /waha/docker-compose.yml
+/waha/backups/

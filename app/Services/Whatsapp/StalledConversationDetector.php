@@ -33,6 +33,7 @@ class StalledConversationDetector
 
         $chats = WhatsappChat::query()
             ->where('kind', 'individual')
+            ->where('ignored', false)
             ->whereNotNull('last_message_at')
             ->whereBetween('last_message_at', [$notOlderThan, $idleBefore])
             ->when($storeId !== null, fn ($q) => $q->whereHas('account', fn ($a) => $a->where('store_id', $storeId)))

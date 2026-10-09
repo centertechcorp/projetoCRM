@@ -53,7 +53,12 @@ extensão está em `whatsapp-extension/README.md`.
 
 ### Depois de uma queda (restart / recovery)
 
-1. `./vendor/bin/sail up -d` — sobe Postgres, app e scheduler.
+1. `./vendor/bin/sail up -d` — sobe Postgres, app, scheduler **e a fila** (processa os jobs do
+   webhook do WAHA; sem isso, mensagem do WAHA fica parada na tabela `jobs` sem gravar).
+   Se o WAHA também estiver em uso: `docker compose -f waha/docker-compose.yml up -d` e confira
+   com `php artisan whatsapp:waha:health-check` se as duas sessões (CENTER/GENIUS) voltaram
+   `WORKING` — se não, precisa reconectar/escanear QR de novo em `http://localhost:3001/dashboard`
+   (ou `:3002` pra GENIUS).
 2. No host (não no Sail), em modo `--database`: `DB_HOST=127.0.0.1 php artisan whatsapp:listen
    --database`. O `DB_HOST=pgsql` do `.env` é só pro app/scheduler de dentro do Sail; de fora
    (no host) o nome `pgsql` não resolve, por isso o override na hora de rodar. Sem `--database`

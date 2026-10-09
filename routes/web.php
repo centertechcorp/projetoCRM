@@ -24,5 +24,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/painel/followups/{followup}/unapprove', [PainelController::class, 'unapproveFollowup'])->name('painel.followups.unapprove');
     Route::post('/painel/leads/{lead}/won', [PainelController::class, 'markWon'])->name('painel.leads.won');
     Route::post('/painel/leads/{lead}/lost', [PainelController::class, 'markLost'])->name('painel.leads.lost');
+    Route::post('/painel/leads/{lead}/delete', [PainelController::class, 'destroy'])->name('painel.leads.delete');
     Route::get('/painel/relatorio', [PainelReportController::class, 'index'])->name('painel.report');
 });

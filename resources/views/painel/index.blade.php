@@ -198,6 +198,48 @@
         });
     }
 
+    let tooltipEl = null;
+    let tooltipTimer = null;
+
+    function bindTooltips(scope) {
+        scope.querySelectorAll('[data-tooltip]').forEach(function (el) {
+            el.addEventListener('mouseenter', function () {
+                clearTimeout(tooltipTimer);
+                tooltipTimer = setTimeout(function () {
+                    if (!tooltipEl) {
+                        tooltipEl = document.createElement('div');
+                        tooltipEl.className = 'pointer-events-none fixed z-50 max-w-xs rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-lg dark:bg-slate-100 dark:text-slate-900';
+                        document.body.appendChild(tooltipEl);
+                    }
+
+                    tooltipEl.textContent = el.dataset.tooltip;
+                    tooltipEl.style.visibility = 'hidden';
+                    tooltipEl.style.display = 'block';
+
+                    const rect = el.getBoundingClientRect();
+                    const tipRect = tooltipEl.getBoundingClientRect();
+                    let top = rect.top - tipRect.height - 8;
+                    if (top < 4) {
+                        top = rect.bottom + 8;
+                    }
+                    let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+                    left = Math.max(4, Math.min(left, window.innerWidth - tipRect.width - 4));
+
+                    tooltipEl.style.top = top + 'px';
+                    tooltipEl.style.left = left + 'px';
+                    tooltipEl.style.visibility = 'visible';
+                }, 3000);
+            });
+
+            el.addEventListener('mouseleave', function () {
+                clearTimeout(tooltipTimer);
+                if (tooltipEl) {
+                    tooltipEl.style.display = 'none';
+                }
+            });
+        });
+    }
+
     function showRowToast(row, message) {
         const colCount = row.children.length;
         const toastRow = document.createElement('tr');
@@ -221,6 +263,10 @@
         form.addEventListener('submit', function (event) {
             event.preventDefault();
 
+            if (form.classList.contains('js-row-delete') && !confirm('Tem certeza que deseja deletar esse contato?')) {
+                return;
+            }
+
             const row = form.closest('[data-lead-row]');
             const leadId = row ? row.dataset.leadRow : null;
 
@@ -231,7 +277,19 @@
             })
                 .then(function (response) { return response.json(); })
                 .then(function (data) {
-                    if (!row || !data.row) {
+                    if (!row) {
+                        return;
+                    }
+
+                    if (data.deleted) {
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(function () { row.remove(); }, 300);
+
+                        return;
+                    }
+
+                    if (!data.row) {
                         return;
                     }
 
@@ -240,6 +298,7 @@
                     const newRow = document.querySelector('[data-lead-row="' + leadId + '"]');
                     if (newRow) {
                         bindCopyButtons(newRow);
+                        bindTooltips(newRow);
                         newRow.querySelectorAll('form.js-row-action').forEach(bindRowAction);
 
                         if (data.message) {
@@ -251,6 +310,7 @@
     }
 
     bindCopyButtons(document);
+    bindTooltips(document);
     document.querySelectorAll('form.js-row-action').forEach(bindRowAction);
 
     (function () {

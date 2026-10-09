@@ -92,6 +92,17 @@ class StalledConversationDetectorTest extends TestCase
         $this->assertSame(0, Lead::count());
     }
 
+    public function test_ignores_chats_marked_as_ignored(): void
+    {
+        $chat = $this->chat('5534999990014', [['in', -48]]);
+        $chat->update(['ignored' => true]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(0, $result['leads_created']);
+        $this->assertSame(0, Lead::count());
+    }
+
     public function test_ignores_chats_that_are_too_recent(): void
     {
         $this->chat('5534999990003', [['in', -2]]);

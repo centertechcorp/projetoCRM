@@ -61,6 +61,28 @@ class LostLeadReconnectorTest extends TestCase
         $this->assertSame(1, $result['leads_reconnected']);
     }
 
+    public function test_does_not_reconnect_a_lead_whose_chat_is_ignored(): void
+    {
+        $account = \App\Models\WhatsappAccount::create([
+            'store_id' => $this->store->id, 'label' => 'Conta', 'provider' => 'web_extension',
+        ]);
+        $chat = \App\Models\WhatsappChat::create([
+            'whatsapp_account_id' => $account->id, 'chat_key' => '5534999990099',
+            'jid' => '5534999990099@c.us', 'kind' => 'individual', 'phone' => '5534999990099',
+            'ignored' => true,
+        ]);
+        $customer = Customer::create(['phone' => '5534999990099', 'name' => 'Fornecedor']);
+        Lead::create([
+            'customer_id' => $customer->id, 'store_id' => $this->store->id, 'status' => 'lost',
+            'lost_at' => now()->subDays(10), 'whatsapp_chat_id' => $chat->id,
+        ]);
+
+        $result = $this->reconnector()->reconnect();
+
+        $this->assertSame(0, $result['leads_reconnected']);
+        $this->assertSame(0, LeadFollowup::count());
+    }
+
     public function test_ignores_leads_that_are_not_lost(): void
     {
         $customer = Customer::create(['phone' => '5534999990004', 'name' => 'Cliente']);

@@ -44,6 +44,25 @@ services:
             - sail
         depends_on:
             - pgsql
+    # Processa a fila (hoje só os jobs do webhook do WAHA — ver app/Jobs/Whatsapp). Sem isso
+    # rodando, os jobs só ficam parados na tabela `jobs`, nada é gravado no banco.
+    queue:
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.5
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: sail-8.5/app
+        entrypoint: ['php', 'artisan', 'queue:work', '--sleep=1', '--tries=3']
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
     pgsql:
         image: 'postgres:18-alpine'
         ports:

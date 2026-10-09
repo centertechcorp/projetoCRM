@@ -7,9 +7,9 @@
     <script>
         (function () {
             const stored = localStorage.getItem('theme');
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-            if (stored === 'dark' || (!stored && prefersDark)) {
+            // Padrão é escuro — só fica claro se o usuário já tiver escolhido isso antes.
+            if (stored !== 'light') {
                 document.documentElement.classList.add('dark');
             }
         })();

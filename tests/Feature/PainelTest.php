@@ -7,6 +7,8 @@ use App\Models\Lead;
 use App\Models\LeadFollowup;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\WhatsappAccount;
+use App\Models\WhatsappChat;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -292,6 +294,42 @@ class PainelTest extends TestCase
 
         $this->actingAs($user)->get('/painel?tab=reconnect')->assertDontSee('5534999990012');
         $this->actingAs($user)->get('/painel?tab=ongoing')->assertSee('5534999990012');
+    }
+
+    public function test_deleting_a_lead_ignores_its_chat_and_removes_it_from_every_tab(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $account = WhatsappAccount::create(['store_id' => $store->id, 'label' => 'Conta', 'provider' => 'web_extension']);
+        $chat = WhatsappChat::create([
+            'whatsapp_account_id' => $account->id, 'chat_key' => '5534999990013',
+            'jid' => '5534999990013@c.us', 'kind' => 'individual', 'phone' => '5534999990013',
+        ]);
+        $customer = Customer::create(['phone' => '5534999990013', 'name' => 'Fornecedor']);
+        $lead = Lead::create([
+            'customer_id' => $customer->id, 'store_id' => $store->id, 'status' => 'open',
+            'whatsapp_chat_id' => $chat->id,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('painel.leads.delete', $lead));
+
+        $response->assertOk()->assertJson(['deleted' => true]);
+        $this->assertTrue($chat->fresh()->ignored);
+        $this->assertNotNull($lead->fresh()->deleted_at);
+        $this->assertSame(0, Lead::count());
+        $this->actingAs($user)->get('/painel?tab=all')->assertDontSee('5534999990013');
+    }
+
+    public function test_deleting_a_lead_without_a_linked_chat_does_not_error(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $lead = $this->makeLead($store, 'Cliente', '5534999990014');
+
+        $response = $this->actingAs($user)->postJson(route('painel.leads.delete', $lead));
+
+        $response->assertOk()->assertJson(['deleted' => true]);
+        $this->assertNotNull($lead->fresh()->deleted_at);
     }
 
     private function makeUser(string $email, string $password, string $role = 'owner', ?int $storeId = null, bool $canDecide = true): User

@@ -46,6 +46,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | WAHA (WhatsApp HTTP API)
+    |--------------------------------------------------------------------------
+    |
+    | `webhook_hmac_key` valida a assinatura `X-Webhook-Hmac` que o WAHA manda em cada
+    | POST (se vazio, nenhuma validação é feita — compatível com a configuração atual,
+    | que ainda não assina). Precisa ser o mesmo valor configurado no WAHA
+    | (WHATSAPP_HOOK_HMAC_KEY ou no `hmac.key` do webhook da sessão).
+    |
+    | `accounts` é usado por App\Console\Commands\WahaHealthCheck pra consultar o status
+    | de cada sessão. base_url aponta pro host (as duas rodam fora da rede do Sail).
+    |
+    */
+
+    'waha' => [
+        'webhook_hmac_key' => env('WAHA_WEBHOOK_HMAC_KEY'),
+
+        'accounts' => [
+            'center' => [
+                'base_url' => env('WAHA_CENTER_BASE_URL', 'http://host.docker.internal:3001'),
+                'api_key' => env('WAHA_CENTER_API_KEY'),
+                'session' => 'CENTER',
+            ],
+            'genius' => [
+                'base_url' => env('WAHA_GENIUS_BASE_URL', 'http://host.docker.internal:3002'),
+                'api_key' => env('WAHA_GENIUS_API_KEY'),
+                'session' => 'GENIUS',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Follow-up de conversas paradas
     |--------------------------------------------------------------------------
     |

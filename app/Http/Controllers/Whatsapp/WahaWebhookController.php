@@ -3,9 +3,8 @@
 namespace App\Http\Controllers\Whatsapp;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Whatsapp\ProcessWahaWebhook;
 use App\Models\WhatsappAccount;
-use App\Services\Whatsapp\MessageRecorder;
-use App\Services\Whatsapp\WahaAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -22,13 +21,12 @@ class WahaWebhookController extends Controller
         'genius' => 'WhatsApp GENIUS',
     ];
 
-    public function __construct(
-        private readonly WahaAdapter $adapter,
-        private readonly MessageRecorder $recorder,
-    ) {}
-
     public function receive(Request $request, string $store): Response
     {
+        if (! $this->signatureIsValid($request)) {
+            return response('', 401);
+        }
+
         $label = self::ACCOUNT_LABEL[$store] ?? null;
 
         if ($label === null) {
@@ -44,13 +42,33 @@ class WahaWebhookController extends Controller
             return response('', 200);
         }
 
-        $event = $request->json()->all();
-        $message = $this->adapter->messageFrom($event);
-
-        if ($message !== null) {
-            $this->recorder->record($account, $message, 'waha', $event);
-        }
+        // Só enfileira e responde — quem grava de verdade é o job, fora do ciclo da
+        // requisição (ver checklist de hospedagem: WAHA reentrega se demorar a responder).
+        ProcessWahaWebhook::dispatch($account->id, $request->json()->all());
 
         return response('', 200);
+    }
+
+    /**
+     * Sem WAHA_WEBHOOK_HMAC_KEY configurada, aceita sem validar (comportamento atual, o WAHA
+     * ainda não assina). Assim que a chave for configurada dos dois lados, passa a exigir.
+     */
+    private function signatureIsValid(Request $request): bool
+    {
+        $secret = config('whatsapp.waha.webhook_hmac_key');
+
+        if (! is_string($secret) || $secret === '') {
+            return true;
+        }
+
+        $header = (string) $request->header('X-Webhook-Hmac');
+
+        if ($header === '') {
+            return false;
+        }
+
+        $expected = hash_hmac('sha512', $request->getContent(), $secret);
+
+        return hash_equals($expected, $header);
     }
 }

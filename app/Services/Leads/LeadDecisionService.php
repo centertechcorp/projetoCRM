@@ -57,4 +57,15 @@ class LeadDecisionService
     {
         $lead->update(['status' => 'lost', 'lost_at' => CarbonImmutable::now(), 'lost_reason' => $reason]);
     }
+
+    /**
+     * Botão "Deletar" do painel: mesmo efeito do comando whatsapp:chats:ignore (o chat nunca
+     * mais vira lead novo nem reconexão de perdido) + soft-delete do lead, que já some de
+     * qualquer aba sozinho (nenhuma query do painel inclui soft-deleted).
+     */
+    public function deletePermanently(Lead $lead): void
+    {
+        $lead->chat?->update(['ignored' => true]);
+        $lead->delete();
+    }
 }

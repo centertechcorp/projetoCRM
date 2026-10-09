@@ -27,6 +27,10 @@ class LostLeadReconnector
             ->where('status', 'lost')
             ->whereNotNull('lost_at')
             ->where('lost_at', '<=', $notReconnectedSince)
+            // Chat marcado como ignorado (whatsapp:chats:ignore) não é cliente de verdade —
+            // não insiste em reconectar com fornecedor, grupo interno ou número de teste.
+            // Lead sem chat vinculado (ex.: import manual) passa normal, nada a filtrar.
+            ->where(fn ($q) => $q->whereDoesntHave('chat')->orWhereHas('chat', fn ($c) => $c->where('ignored', false)))
             ->when($storeId !== null, fn ($q) => $q->where('store_id', $storeId))
             ->get();
 

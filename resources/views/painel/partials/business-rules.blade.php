@@ -35,9 +35,10 @@
                 <li><strong>Aprovar</strong> — libera o botão "Copiar link" (copia o link do WhatsApp com a mensagem pronta; cole na janela do Chrome da loja certa e mande na mão — nada é enviado sozinho).</li>
                 <li><strong>Copiar link</strong> — copia o link pra área de transferência (não abre direto, pra evitar mandar pela conta errada). Cole na janela do Chrome da loja certa.</li>
                 <li><strong>Desfazer aprovação</strong> — volta a sugestão pro estado de antes de aprovar, caso tenha clicado "Aprovar" sem querer.</li>
-                <li><strong>Descartar</strong> — só cancela essa sugestão específica. O lead continua existindo e volta pra "Em andamento"; pode ganhar uma sugestão nova depois de <strong>{{ $f['cooldown_days'] }} dias</strong>, até <strong>{{ $f['max_attempts'] }} tentativas</strong> no total.</li>
+                <li><strong>Separar</strong> — pra quando a resposta do cliente é ambígua (nem desistiu, nem comprou ainda, tipo "vou ver e te falo"). Cancela só essa sugestão, o lead volta pra "Em andamento"; pode ganhar uma sugestão nova depois de <strong>{{ $f['cooldown_days'] }} dias</strong>, até <strong>{{ $f['max_attempts'] }} tentativas</strong> no total.</li>
                 <li><strong>Comprou</strong> — vai direto pra "Pós-venda".</li>
                 <li><strong>Perdeu</strong> — vai direto pra "Desistiu" (e pode ser reconectado automaticamente depois, como explicado acima).</li>
+                <li><strong>Deletar</strong> — pra contato que não é cliente de verdade (fornecedor, número de teste, grupo fora do assunto). Marca o chat como ignorado pra sempre (nunca mais vira lead nem reconexão automática) e some do painel na hora. Sem desfazer pela tela.</li>
             </ul>
         </div>
 
