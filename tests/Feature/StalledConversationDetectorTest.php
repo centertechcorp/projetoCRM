@@ -157,6 +157,36 @@ class StalledConversationDetectorTest extends TestCase
         $this->assertSame(1, LeadFollowup::count());
     }
 
+    public function test_the_same_phone_writing_to_two_stores_gets_an_independent_lead_in_each(): void
+    {
+        $genius = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+        $geniusAccount = WhatsappAccount::create(['store_id' => $genius->id, 'label' => 'Conta Genius', 'provider' => 'web_extension']);
+
+        // Mesmo número de telefone, uma conversa parada em cada loja.
+        $this->chat('5534999990099', [['in', -48]]); // já cria em $this->account (CENTER)
+
+        $geniusChat = WhatsappChat::create([
+            'whatsapp_account_id' => $geniusAccount->id,
+            'chat_key' => '5534999990099',
+            'jid' => '5534999990099@c.us',
+            'kind' => 'individual',
+            'phone' => '5534999990099',
+            'display_name' => 'Cliente Teste',
+        ]);
+        $this->message($geniusChat, 'in', -48, 'genius-1');
+        $geniusChat->update(['last_message_at' => CarbonImmutable::now()->subHours(48)]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(2, $result['leads_created']);
+        $this->assertSame(1, Customer::count(), 'mesmo telefone = mesmo cliente, não duplica o customer');
+        $this->assertSame(2, Lead::count(), 'mas um lead por loja, independentes');
+
+        $centerLead = Lead::where('store_id', $this->store->id)->sole();
+        $geniusLead = Lead::where('store_id', $genius->id)->sole();
+        $this->assertNotSame($centerLead->id, $geniusLead->id);
+    }
+
     public function test_only_covers_the_given_store(): void
     {
         $other = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);

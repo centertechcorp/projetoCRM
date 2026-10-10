@@ -50,6 +50,22 @@ class PainelReportTest extends TestCase
         $response->assertSeeInOrder(['CENTER', '1 ', 'recebidas', '1 ', 'enviadas']);
     }
 
+    public function test_an_invalid_date_falls_back_to_today_instead_of_crashing(): void
+    {
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $this->actingAs($user)->get('/painel/relatorio?date=data-invalida-aqui')
+            ->assertOk()
+            ->assertSee(CarbonImmutable::now()->format('d/m/Y'));
+    }
+
+    public function test_a_non_numeric_store_filter_is_ignored_instead_of_crashing(): void
+    {
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $this->actingAs($user)->get('/painel/relatorio?store=abc')->assertOk();
+    }
+
     public function test_group_messages_never_appear_in_the_report(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);

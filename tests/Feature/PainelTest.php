@@ -332,6 +332,59 @@ class PainelTest extends TestCase
         $this->assertNotNull($lead->fresh()->deleted_at);
     }
 
+    public function test_a_seller_cannot_act_on_a_lead_from_another_store(): void
+    {
+        $ownStore = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $otherStore = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+        $seller = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'seller', $ownStore->id);
+        $lead = $this->makeLead($otherStore, 'Cliente da Genius', '5534999990020');
+        $followup = LeadFollowup::create([
+            'lead_id' => $lead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
+            'status' => 'candidate', 'suggested_by' => 'rules',
+        ]);
+
+        $this->actingAs($seller)->post(route('painel.leads.won', $lead))->assertForbidden();
+        $this->actingAs($seller)->post(route('painel.leads.lost', $lead))->assertForbidden();
+        $this->actingAs($seller)->post(route('painel.leads.delete', $lead))->assertForbidden();
+        $this->actingAs($seller)->post(route('painel.followups.approve', $followup))->assertForbidden();
+        $this->actingAs($seller)->post(route('painel.followups.dismiss', $followup))->assertForbidden();
+
+        $this->assertSame('open', $lead->fresh()->status);
+        $this->assertSame('candidate', $followup->fresh()->status);
+        $this->assertSame(1, Lead::count());
+    }
+
+    public function test_a_user_without_can_decide_cannot_act_even_on_their_own_stores_lead(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $viewer = $this->makeUser('viewer@center.com', 'senha-boa-123', 'seller', $store->id, canDecide: false);
+        $lead = $this->makeLead($store, 'Cliente', '5534999990021');
+
+        $this->actingAs($viewer)->post(route('painel.leads.won', $lead))->assertForbidden();
+        $this->actingAs($viewer)->post(route('painel.leads.delete', $lead))->assertForbidden();
+
+        $this->assertSame('open', $lead->fresh()->status);
+    }
+
+    public function test_a_seller_can_act_on_their_own_stores_lead(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $seller = $this->makeUser('vendedor2@center.com', 'senha-boa-123', 'seller', $store->id);
+        $lead = $this->makeLead($store, 'Cliente', '5534999990022');
+
+        $this->actingAs($seller)->post(route('painel.leads.won', $lead))->assertRedirect();
+
+        $this->assertSame('won', $lead->fresh()->status);
+    }
+
+    public function test_a_non_numeric_store_filter_is_ignored_instead_of_crashing(): void
+    {
+        Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $this->actingAs($user)->get('/painel?tab=all&store=abc')->assertOk();
+    }
+
     private function makeUser(string $email, string $password, string $role = 'owner', ?int $storeId = null, bool $canDecide = true): User
     {
         return User::create([

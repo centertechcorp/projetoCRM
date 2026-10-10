@@ -32,6 +32,8 @@ class PainelController extends Controller
         $user = $request->user();
 
         $storeId = $user->isSeller() ? $user->store_id : $request->query('store');
+        // Vem da URL — pode ser lixo (edição manual, link quebrado). Sem isso, "store=abc" quebra a query no banco.
+        $storeId = is_numeric($storeId) ? (int) $storeId : null;
         $search = trim((string) $request->query('search'));
         $priority = (string) $request->query('priority', '');
 

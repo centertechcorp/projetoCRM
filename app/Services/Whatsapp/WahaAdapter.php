@@ -72,11 +72,22 @@ class WahaAdapter
             return null;
         }
 
-        // O WAHA avisa que tem mídia mas não manda o arquivo no webhook — fica pendente,
-        // igual acontece hoje com a Cloud API (MetaCloudApiAdapter).
+        $media = $payload['media'] ?? null;
+
+        // O WAHA baixa a mídia sozinho por padrão e manda a URL pra buscar (expira depois de
+        // um tempo do lado deles — quem baixa de verdade é App\Jobs\Whatsapp\DownloadWahaMedia).
+        // Às vezes hasMedia vem true mas media vem nulo (configuração deles bloqueou o
+        // download) — nesse caso fica só o metadado, sem como buscar o arquivo.
+        $url = is_array($media) && is_string($media['url'] ?? null) ? $media['url'] : null;
+        $mimeType = is_array($media) && is_string($media['mimetype'] ?? null) ? $media['mimetype'] : null;
+        $filename = is_array($media) && is_string($media['filename'] ?? null) ? $media['filename'] : null;
+
         return new IncomingMedia(
             kind: $type,
+            mimeType: $mimeType,
+            filename: $filename,
             providerMediaId: is_string($payload['id'] ?? null) ? $payload['id'] : null,
+            sourceUrl: $url,
         );
     }
 

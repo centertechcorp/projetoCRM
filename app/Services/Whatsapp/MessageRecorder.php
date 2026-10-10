@@ -2,6 +2,7 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Jobs\Whatsapp\DownloadWahaMedia;
 use App\Models\Event;
 use App\Models\WhatsappAccount;
 use App\Models\WhatsappChat;
@@ -239,11 +240,18 @@ class MessageRecorder
             'storage_disk' => $media->storageDisk,
             'storage_path' => $media->storagePath,
             'provider_media_id' => $media->providerMediaId,
+            'source_url' => $media->sourceUrl,
             'download_status' => $media->downloadStatus(),
             'duration_seconds' => $media->durationSeconds,
             // Só áudio é transcrito; quem processa a fila muda o status depois.
             'transcript_status' => $media->kind === 'audio' ? 'pending' : null,
         ]);
+
+        // Pendente e com link pra buscar (hoje só o WAHA manda isso) — enfileira o download de
+        // verdade. Sem link (ex.: Cloud API, que só dá um id de mídia), fica pendente mesmo.
+        if ($stored->download_status === 'pending' && $media->sourceUrl !== null) {
+            DownloadWahaMedia::dispatch($stored->id);
+        }
 
         // Sem arquivo ainda, quem baixa a mídia (e depois transcreve) é avisado pelo evento "pending".
         $this->emit(

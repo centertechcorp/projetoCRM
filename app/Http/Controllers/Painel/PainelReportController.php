@@ -15,8 +15,15 @@ class PainelReportController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $date = CarbonImmutable::parse($request->query('date', CarbonImmutable::now()->toDateString()))->startOfDay();
+
+        try {
+            $date = CarbonImmutable::parse($request->query('date', CarbonImmutable::now()->toDateString()))->startOfDay();
+        } catch (\Exception) {
+            // Data inválida na URL (edição manual, link quebrado etc.) — cai pra hoje em vez de quebrar a página.
+            $date = CarbonImmutable::now()->startOfDay();
+        }
         $storeId = $user->isSeller() ? $user->store_id : $request->query('store');
+        $storeId = is_numeric($storeId) ? (int) $storeId : null;
         $search = trim((string) $request->query('search'));
 
         $messages = WhatsappMessage::query()

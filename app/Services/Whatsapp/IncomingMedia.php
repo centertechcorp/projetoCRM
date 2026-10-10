@@ -23,6 +23,7 @@ final readonly class IncomingMedia
         public ?int $durationSeconds = null,
         public ?string $filename = null,
         public ?string $providerMediaId = null,
+        public ?string $sourceUrl = null,
     ) {}
 
     public function downloadStatus(): string
