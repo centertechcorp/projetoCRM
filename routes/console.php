@@ -13,6 +13,6 @@ Artisan::command('inspire', function () {
 // hora. Precisa do serviço "scheduler" do docker-compose.yml rodando `schedule:run` a cada minuto.
 Schedule::command('whatsapp:leads:detect')->dailyAt('18:00')->withoutOverlapping();
 
-// Confere se as sessões do WAHA caíram (status != WORKING) e loga alerta — não manda
-// notificação ainda, só fica no laravel.log até decidirmos o canal (email/whatsapp-pra-si-mesmo).
+// Confere se as sessões do WAHA caíram. 1ª vez: tenta reconectar sozinho. Continua caída:
+// manda WhatsApp de verdade pro Caio via a outra loja, e alimenta o aviso no painel.
 Schedule::command('whatsapp:waha:health-check')->everyFiveMinutes()->withoutOverlapping();

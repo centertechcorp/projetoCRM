@@ -385,6 +385,24 @@ class PainelTest extends TestCase
         $this->actingAs($user)->get('/painel?tab=all&store=abc')->assertOk();
     }
 
+    public function test_shows_a_banner_when_a_waha_store_is_down(): void
+    {
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+        \Illuminate\Support\Facades\Cache::forever('waha_down_stores', ['center']);
+
+        $this->actingAs($user)->get('/painel')
+            ->assertSee('WhatsApp desconectado')
+            ->assertSee('CENTER');
+    }
+
+    public function test_no_banner_when_every_waha_store_is_up(): void
+    {
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+        \Illuminate\Support\Facades\Cache::forever('waha_down_stores', []);
+
+        $this->actingAs($user)->get('/painel')->assertDontSee('WhatsApp desconectado');
+    }
+
     private function makeUser(string $email, string $password, string $role = 'owner', ?int $storeId = null, bool $canDecide = true): User
     {
         return User::create([

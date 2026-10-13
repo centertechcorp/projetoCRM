@@ -3,6 +3,7 @@
 namespace App\Services\Leads;
 
 use App\Models\Lead;
+use Illuminate\Support\Collection;
 
 /**
  * Pontua (0-100) quão crucial é reabordar um lead agora, olhando as últimas mensagens do
@@ -40,6 +41,46 @@ class LeadPriorityScorer
         $score += min(substr_count($body, '?') * 5, 15);
 
         return min($score, 100);
+    }
+
+    /**
+     * Mesma conta do score(), mas sem precisar de um Lead — usado pra ranquear conversa do
+     * Relatório do dia (App\Http\Controllers\Painel\PainelReportController), que nem sempre
+     * já virou lead. Sem o bônus de orçamento/produto do cadastro (não existe nesse contexto).
+     *
+     * @param  Collection<int, \App\Models\WhatsappMessage>  $customerMessages
+     */
+    public function scoreMessages(Collection $customerMessages): int
+    {
+        $body = self::normalize($customerMessages->pluck('body')->implode(' '));
+
+        $score = 0;
+        $score += $this->hasClosingQuestion($body) ? 25 : 0;
+        $score += $this->mentionsProductText($body) ? 15 : 0;
+        $score += min($customerMessages->count() * 3, 15);
+        $score += min(substr_count($body, '?') * 5, 15);
+
+        return min($score, 100);
+    }
+
+    /** @param  Collection<int, \App\Models\WhatsappMessage>  $customerMessages */
+    public function reasonForMessages(Collection $customerMessages): ?string
+    {
+        $body = self::normalize($customerMessages->pluck('body')->implode(' '));
+
+        if ($this->hasClosingQuestion($body)) {
+            return 'Perguntou sobre fechamento (preço, parcelamento, entrega...)';
+        }
+
+        if ($this->mentionsProductText($body)) {
+            return 'Citou produto específico';
+        }
+
+        if (substr_count($body, '?') > 0) {
+            return 'Fez pergunta direta';
+        }
+
+        return null;
     }
 
     public function label(int $score): string
@@ -98,6 +139,11 @@ class LeadPriorityScorer
             return true;
         }
 
+        return $this->mentionsProductText($normalizedBody);
+    }
+
+    private function mentionsProductText(string $normalizedBody): bool
+    {
         foreach (config('whatsapp.group_topics.keywords', []) as $keyword) {
             if (str_contains($normalizedBody, self::normalize($keyword))) {
                 return true;

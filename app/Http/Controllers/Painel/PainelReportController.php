@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Painel;
 use App\Http\Controllers\Controller;
 use App\Models\Store;
 use App\Models\WhatsappMessage;
+use App\Services\Leads\LeadPriorityScorer;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ use Illuminate\View\View;
 
 class PainelReportController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, LeadPriorityScorer $scorer): View
     {
         $user = $request->user();
 
@@ -44,10 +45,11 @@ class PainelReportController extends Controller
             'enviadas' => $group->where('direction', 'out')->count(),
         ])->sortKeys();
 
-        $conversations = $messages->groupBy('whatsapp_chat_id')->map(function ($group) {
-            $first = $group->first();
+        $ranked = $request->boolean('rank');
 
-            return [
+        $conversations = $messages->groupBy('whatsapp_chat_id')->map(function ($group) use ($scorer, $ranked) {
+            $first = $group->first();
+            $entry = [
                 'chat' => $first->chat,
                 'store' => $first->account->store,
                 'messages' => $group->values(),
@@ -55,7 +57,20 @@ class PainelReportController extends Controller
                 'recebidas' => $group->where('direction', 'in')->count(),
                 'enviadas' => $group->where('direction', 'out')->count(),
             ];
-        })->sortByDesc('last_sent_at')->values();
+
+            if ($ranked) {
+                $customerMessages = $group->where('direction', 'in')->values();
+                $entry['score'] = $scorer->scoreMessages($customerMessages);
+                $entry['priority_label'] = $scorer->label($entry['score']);
+                $entry['priority_reason'] = $scorer->reasonForMessages($customerMessages);
+            }
+
+            return $entry;
+        });
+
+        $conversations = $ranked
+            ? $conversations->sortByDesc('score')->values()
+            : $conversations->sortByDesc('last_sent_at')->values();
 
         return view('painel.report', [
             'date' => $date,
@@ -65,6 +80,7 @@ class PainelReportController extends Controller
             'stores' => $user->isSeller() ? collect() : Store::where('code', '!=', 'MIXCELL')->orderBy('name')->get(),
             'selectedStore' => $storeId,
             'search' => $search,
+            'ranked' => $ranked,
         ]);
     }
 }

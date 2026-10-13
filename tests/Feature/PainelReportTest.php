@@ -103,6 +103,52 @@ class PainelReportTest extends TestCase
         $response->assertDontSee('Mensagem do GENIUS');
     }
 
+    public function test_without_rank_the_button_says_gerar_leads_do_dia_and_order_is_chronological(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+
+        $weak = $this->makeChat($account, 'Cliente Fraco', '5534999990010');
+        $this->makeMessage($account, $weak, 'in', 'oi', now()->subHours(3));
+
+        $strong = $this->makeChat($account, 'Cliente Forte', '5534999990011');
+        $this->makeMessage($account, $strong, 'in', 'Quanto fica no boleto, tem desconto?', now()->subHour());
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->get('/painel/relatorio');
+
+        $response->assertOk();
+        $response->assertSee('Gerar leads do dia');
+        $response->assertDontSee('Voltar pra ordem cronológica');
+        // Sem rank, é por hora — "oi" (3h atrás) vem antes de "Quanto fica..." (1h atrás)? Não:
+        // ordena por last_sent_at DESC, então o mais recente (Forte) aparece primeiro mesmo sem rank.
+        $response->assertSeeInOrder(['Cliente Forte', 'Cliente Fraco']);
+    }
+
+    public function test_rank_orders_strongest_lead_first_regardless_of_time(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+
+        // O fraco é mais recente que o forte — sem rank ficaria primeiro; com rank, não.
+        $weak = $this->makeChat($account, 'Cliente Fraco', '5534999990012');
+        $this->makeMessage($account, $weak, 'in', 'oi', now()->subMinutes(10));
+
+        $strong = $this->makeChat($account, 'Cliente Forte', '5534999990013');
+        $this->makeMessage($account, $strong, 'in', 'Quanto fica parcelado no cartão pra esse iphone? Tem desconto à vista?', now()->subHours(5));
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->get('/painel/relatorio?rank=1');
+
+        $response->assertOk();
+        $response->assertSee('Voltar pra ordem cronológica');
+        $response->assertSeeInOrder(['Cliente Forte', 'Cliente Fraco']);
+        $response->assertSee('🔥 Alta');
+        $response->assertSee('⚪ Baixa');
+    }
+
     private function makeUser(string $email, string $password, string $role = 'owner', ?int $storeId = null): User
     {
         return User::create([

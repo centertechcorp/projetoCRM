@@ -127,6 +127,37 @@ class LeadPriorityScorerTest extends TestCase
         $this->assertSame('Alta', $scorer->label(50));
     }
 
+    public function test_score_messages_works_without_a_lead_for_the_daily_report_ranking(): void
+    {
+        $chat = $this->chat();
+        $at = CarbonImmutable::now()->subHours(2);
+        $this->message($chat, 'in', $at, 'Quanto fica no boleto?', 'r1');
+
+        $messages = $chat->messages()->where('direction', 'in')->get();
+
+        // 25 (fechamento) + 3 (1 msg) + 5 (1 "?") = 33 — mesma formula do score(Lead), só
+        // sem o bonus de orcamento/produto do cadastro (nao existe fora de um Lead).
+        $this->assertSame(33, $this->scorer()->scoreMessages($messages));
+        $this->assertStringContainsString('fechamento', $this->scorer()->reasonForMessages($messages));
+    }
+
+    public function test_score_messages_with_no_signal_at_all_is_zero(): void
+    {
+        $chat = $this->chat();
+        $this->message($chat, 'in', CarbonImmutable::now()->subHours(2), 'oi', 'r2');
+
+        $messages = $chat->messages()->where('direction', 'in')->get();
+
+        $this->assertSame(3, $this->scorer()->scoreMessages($messages));
+        $this->assertNull($this->scorer()->reasonForMessages($messages));
+    }
+
+    public function test_score_messages_with_an_empty_collection_is_zero(): void
+    {
+        $this->assertSame(0, $this->scorer()->scoreMessages(collect()));
+        $this->assertNull($this->scorer()->reasonForMessages(collect()));
+    }
+
     private function scorer(): LeadPriorityScorer
     {
         return app(LeadPriorityScorer::class);

@@ -62,6 +62,14 @@ return [
     'waha' => [
         'webhook_hmac_key' => env('WAHA_WEBHOOK_HMAC_KEY'),
 
+        // Pra quem App\Console\Commands\WahaHealthCheck manda o alerta de WhatsApp quando uma
+        // sessão cai e a tentativa de reconexão automática não resolveu sozinha. Lista separada
+        // por vírgula, manda pra todos.
+        'alert_phones' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('WAHA_ALERT_PHONES', '5534999748837,5519999833188'))
+        ))),
+
         'accounts' => [
             'center' => [
                 'base_url' => env('WAHA_CENTER_BASE_URL', 'http://host.docker.internal:3001'),

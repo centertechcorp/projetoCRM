@@ -2,6 +2,15 @@
 
 @section('title', 'Relatório do dia')
 
+@php
+    $priorityBadge = [
+        'Alta' => 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+        'Média' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+        'Baixa' => 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    ];
+    $priorityIcon = ['Alta' => '🔥', 'Média' => '🟡', 'Baixa' => '⚪'];
+@endphp
+
 @section('content')
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
     <div class="flex items-center gap-3">
@@ -22,6 +31,19 @@
                     <option value="{{ $store->id }}" @selected((string) $selectedStore === (string) $store->id)>{{ $store->code }}</option>
                 @endforeach
             </select>
+        @endif
+        @if ($ranked)
+            <input type="hidden" name="rank" value="0">
+            <button type="submit" title="Volta pra ordem cronológica (mais recente primeiro)."
+                class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                Voltar pra ordem cronológica
+            </button>
+        @else
+            <input type="hidden" name="rank" value="1">
+            <button type="submit" title="Calcula, pra esse dia, quais conversas parecem mais perto de fechar — do mais forte pro mais fraco."
+                class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                Gerar leads do dia
+            </button>
         @endif
     </form>
 </div>
@@ -69,6 +91,12 @@
                         <td class="whitespace-nowrap px-4 py-3">
                             <div class="text-slate-900 dark:text-slate-100">{{ $chat->display_name ?: '(sem nome)' }}</div>
                             <div class="text-slate-500 dark:text-slate-400">{{ $chat->phone ?? $chat->chat_key }}</div>
+                            @if ($ranked)
+                                <span class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {{ $priorityBadge[$conversation['priority_label']] }}"
+                                    @if ($conversation['priority_reason']) title="{{ $conversation['priority_reason'] }}" @endif>
+                                    #{{ $i + 1 }} {{ $priorityIcon[$conversation['priority_label']] }} {{ $conversation['priority_label'] }} · {{ $conversation['score'] }}
+                                </span>
+                            @endif
                         </td>
                         <td class="whitespace-nowrap px-4 py-3">
                             <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ $conversation['recebidas'] }} recebidas</span>
