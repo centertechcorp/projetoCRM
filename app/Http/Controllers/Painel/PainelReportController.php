@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\Painel;
 
 use App\Http\Controllers\Controller;
+use App\Models\Lead;
 use App\Models\Store;
+use App\Models\WhatsappChat;
 use App\Models\WhatsappMessage;
 use App\Services\Leads\LeadPriorityScorer;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class PainelReportController extends Controller
 {
@@ -29,7 +33,9 @@ class PainelReportController extends Controller
         $search = trim((string) $request->query('search'));
 
         $messages = WhatsappMessage::query()
-            ->whereHas('chat', fn ($q) => $q->where('kind', 'individual'))
+            // Chat ignorado (botão "Ignorar"/"Deletar") some do relatório pra sempre, mesmo
+            // nos dias em que já tinha mensagem gravada antes de ser ignorado.
+            ->whereHas('chat', fn ($q) => $q->where('kind', 'individual')->where('ignored', false))
             // Buscando, o contato tem que aparecer independente do dia — "se tá no banco, tem
             // que aparecer" — então só restringe pelo dia selecionado quando não há busca.
             ->when($search === '', fn ($q) => $q->whereBetween('sent_at', [$date, $date->endOfDay()]))
@@ -49,8 +55,18 @@ class PainelReportController extends Controller
         ])->sortKeys();
 
         $ranked = $request->boolean('rank');
+        $canDecide = (bool) $user->can_decide;
 
-        $conversations = $messages->groupBy('whatsapp_chat_id')->map(function ($group) use ($scorer, $ranked) {
+        // Conversa pode já ter virado lead (StalledConversationDetector) mesmo sem o
+        // relatório ter sido gerado antes — busca pra poder mostrar os mesmos botões de
+        // ação (Comprou/Perdeu/Deletar...) do painel direto aqui.
+        $leadsByChat = Lead::query()
+            ->whereIn('whatsapp_chat_id', $messages->pluck('whatsapp_chat_id')->unique())
+            ->with(['customer', 'store', 'followups' => fn ($q) => $q->latest()])
+            ->get()
+            ->keyBy('whatsapp_chat_id');
+
+        $conversations = $messages->groupBy('whatsapp_chat_id')->map(function ($group) use ($scorer, $ranked, $leadsByChat) {
             $first = $group->first();
             $entry = [
                 'chat' => $first->chat,
@@ -59,6 +75,7 @@ class PainelReportController extends Controller
                 'last_sent_at' => $group->max('sent_at'),
                 'recebidas' => $group->where('direction', 'in')->count(),
                 'enviadas' => $group->where('direction', 'out')->count(),
+                'lead' => $leadsByChat->get($first->whatsapp_chat_id),
             ];
 
             if ($ranked) {
@@ -82,6 +99,7 @@ class PainelReportController extends Controller
                 'html' => view('painel.partials.report-results', [
                     'search' => $search, 'date' => $date, 'summary' => $summary,
                     'messages' => $messages, 'conversations' => $conversations, 'ranked' => $ranked,
+                    'canDecide' => $canDecide,
                 ])->render(),
             ]);
         }
@@ -95,6 +113,36 @@ class PainelReportController extends Controller
             'selectedStore' => $storeId,
             'search' => $search,
             'ranked' => $ranked,
+            'canDecide' => $canDecide,
         ]);
+    }
+
+    /**
+     * Ignora uma conversa direto do Relatório do dia, mesmo quando ela ainda não virou lead
+     * (ex.: fornecedor com atendimento automático) — mesmo efeito do botão "Deletar" do
+     * painel (App\Services\Leads\LeadDecisionService::deletePermanently), só que sem precisar
+     * de um Lead já existir.
+     */
+    public function ignoreChat(Request $request, WhatsappChat $chat): RedirectResponse|JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user->can_decide) {
+            abort(Response::HTTP_FORBIDDEN, 'Você não tem permissão para decidir sobre leads.');
+        }
+
+        if ($user->isSeller() && $chat->account->store_id !== $user->store_id) {
+            abort(Response::HTTP_FORBIDDEN, 'Essa conversa não é da sua loja.');
+        }
+
+        $chat->update(['ignored' => true]);
+
+        $message = 'Contato ignorado — nunca mais vira lead e some do relatório.';
+
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true, 'message' => $message]);
+        }
+
+        return back()->with('status', $message);
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
+use App\Models\Lead;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\WhatsappAccount;
@@ -186,6 +188,79 @@ class PainelReportTest extends TestCase
         $response->assertSeeInOrder(['Cliente Forte', 'Cliente Fraco']);
         $response->assertSee('🔥 Alta');
         $response->assertSee('⚪ Baixa');
+    }
+
+    public function test_shows_an_ignorar_button_for_a_conversation_that_never_became_a_lead(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $chat = $this->makeChat($account, 'Multishine Casa Da limpeza', '5534999990099');
+        $this->makeMessage($account, $chat, 'in', 'Pedido mínimo para entrega 40,00', now());
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->get('/painel/relatorio');
+
+        $response->assertOk();
+        $response->assertSee('Ignorar');
+        $response->assertDontSee('Deletar');
+    }
+
+    public function test_shows_the_same_lead_action_buttons_when_the_conversation_already_has_a_lead(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $chat = $this->makeChat($account, 'Alana', '5534999990099');
+        $this->makeMessage($account, $chat, 'in', 'oi', now());
+
+        $customer = Customer::create(['name' => 'Alana', 'phone' => '5534999990099']);
+        Lead::create([
+            'customer_id' => $customer->id,
+            'store_id' => $center->id,
+            'whatsapp_chat_id' => $chat->id,
+            'source' => 'whatsapp',
+            'status' => 'open',
+        ]);
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->get('/painel/relatorio');
+
+        $response->assertOk();
+        $response->assertSee('Comprou');
+        $response->assertSee('Perdeu');
+        $response->assertSee('Deletar');
+        $response->assertDontSee('Ignorar');
+    }
+
+    public function test_ignoring_a_chat_from_the_report_removes_it_and_it_never_becomes_a_lead(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $chat = $this->makeChat($account, 'Multishine Casa Da limpeza', '5534999990099');
+        $this->makeMessage($account, $chat, 'in', 'Pedido mínimo para entrega 40,00', now());
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $this->actingAs($user)->post("/painel/chats/{$chat->id}/ignore")
+            ->assertRedirect();
+
+        $this->assertTrue($chat->fresh()->ignored);
+
+        $this->actingAs($user)->get('/painel/relatorio')->assertDontSee('Multishine');
+    }
+
+    public function test_a_seller_cannot_ignore_a_chat_from_another_store(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $genius = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+        $geniusAccount = $this->makeAccount($genius, 'GENIUS');
+        $chat = $this->makeChat($geniusAccount, 'Cliente Genius', '5534999990098');
+
+        $seller = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'seller', $center->id);
+
+        $this->actingAs($seller)->post("/painel/chats/{$chat->id}/ignore")->assertForbidden();
+        $this->assertFalse($chat->fresh()->ignored);
     }
 
     private function makeUser(string $email, string $password, string $role = 'owner', ?int $storeId = null): User

@@ -26,4 +26,5 @@ Route::middleware('auth')->group(function () {
     Route::post('/painel/leads/{lead}/lost', [PainelController::class, 'markLost'])->name('painel.leads.lost');
     Route::post('/painel/leads/{lead}/delete', [PainelController::class, 'destroy'])->name('painel.leads.delete');
     Route::get('/painel/relatorio', [PainelReportController::class, 'index'])->name('painel.report');
+    Route::post('/painel/chats/{chat}/ignore', [PainelReportController::class, 'ignoreChat'])->name('painel.chats.ignore');
 });

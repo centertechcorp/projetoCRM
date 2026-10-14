@@ -39,6 +39,9 @@
                     <th class="px-4 py-3">Contato</th>
                     <th class="px-4 py-3">Direção</th>
                     <th class="px-4 py-3">Mensagem</th>
+                    @if ($canDecide)
+                        <th class="px-4 py-3">Ações</th>
+                    @endif
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -96,6 +99,18 @@
                                 </ul>
                             </details>
                         </td>
+                        @if ($canDecide)
+                            <td class="px-4 py-3">
+                                @if ($conversation['lead'])
+                                    @include('painel.partials.lead-actions', ['lead' => $conversation['lead'], 'canDecide' => $canDecide, 'ajax' => false])
+                                @else
+                                    <form method="POST" action="{{ route('painel.chats.ignore', $chat) }}" class="js-confirm-delete">
+                                        @csrf
+                                        <button data-tooltip="Ignora esse contato pra sempre (nunca mais vira lead) e some do relatório." class="w-full rounded-full border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-400 dark:bg-slate-950 dark:text-red-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(248,113,113,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(248,113,113,0.4)]">Ignorar</button>
+                                    </form>
+                                @endif
+                            </td>
+                        @endif
                     </tr>
                 @endforeach
             </tbody>

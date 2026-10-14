@@ -157,11 +157,28 @@ return [
     ],
 
     'group_topics' => [
+        // Ordem importa pro LeadInfoExtractor: ele usa a primeira palavra que bater na
+        // mensagem, então termos específicos (marca/modelo) vêm antes dos genéricos
+        // ("celular", "smartphone", "eletronico") — senão "esse celular samsung" vira
+        // só "celular" em vez de "samsung".
         'keywords' => [
-            'celular', 'smartphone', 'iphone', 'ipad', 'samsung', 'xiaomi', 'motorola', 'redmi',
-            'notebook', 'tablet', 'carregador', 'fone', 'fone de ouvido', 'headset', 'airpods',
-            'capinha', 'capa', 'pelicula', 'película', 'tela', 'display', 'bateria', 'placa',
-            'peca', 'peça', 'eletronico', 'eletrônico', 'imei', 'gb',
+            // Marca/modelo
+            'iphone', 'ipad', 'apple watch', 'samsung', 'galaxy', 'xiaomi', 'redmi', 'poco',
+            'motorola', 'moto g', 'moto e', 'asus', 'lg', 'huawei', 'honor', 'realme',
+            'oneplus', 'nokia', 'lenovo', 'positivo', 'multilaser',
+            // Categoria
+            'notebook', 'tablet', 'smartwatch', 'relogio', 'relógio', 'videogame', 'console',
+            // Acessório
+            'carregador portatil', 'carregador', 'power bank', 'powerbank', 'fone bluetooth',
+            'fone de ouvido', 'headset', 'airpods', 'fone', 'bluetooth', 'caixa de som',
+            'caixinha de som', 'capinha', 'capa', 'pelicula', 'película', 'vidro', 'cabo usb',
+            'cabo tipo c', 'cabo', 'fonte',
+            // Peça/conserto
+            'tela', 'display', 'touch', 'bateria', 'placa mãe', 'placa-mae', 'placa', 'conector',
+            'flex', 'chip', 'sim card', 'cartao de memoria', 'memoria', 'hd', 'ssd', 'peca',
+            'peça', 'imei', 'gb',
+            // Genérico (por último de propósito — ver comentário acima)
+            'celular', 'smartphone', 'eletronico', 'eletrônico',
         ],
 
         // Mensagem com mais de tantos "R$" vira tabela de preço/catálogo, não pergunta de

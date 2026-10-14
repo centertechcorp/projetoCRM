@@ -43,6 +43,7 @@
     @include('painel.partials.report-results', [
         'search' => $search, 'date' => $date, 'summary' => $summary,
         'messages' => $messages, 'conversations' => $conversations, 'ranked' => $ranked,
+        'canDecide' => $canDecide,
     ])
 </div>
 
@@ -74,7 +75,18 @@
         });
     }
 
+    function bindConfirmDelete(scope) {
+        scope.querySelectorAll('form.js-confirm-delete').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!confirm('Tem certeza que deseja deletar esse contato?')) {
+                    event.preventDefault();
+                }
+            });
+        });
+    }
+
     bindCopyButtons(document);
+    bindConfirmDelete(document);
 
     (function () {
         const input = document.getElementById('reportSearchInput');
@@ -100,6 +112,7 @@
                 .then(function (data) {
                     results.innerHTML = data.html;
                     bindCopyButtons(results);
+                    bindConfirmDelete(results);
                     history.replaceState(null, '', url);
                 });
         }
