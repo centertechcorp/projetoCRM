@@ -53,6 +53,31 @@ class StalledConversationDetectorTest extends TestCase
         $this->assertSame('candidate', $followup->status);
     }
 
+    public function test_fills_product_interest_and_quoted_amount_from_the_conversation(): void
+    {
+        $this->chat('5534999990030', [
+            ['in', -96, 'oi, queria saber sobre o iphone 13'],
+            ['out', -95, 'opa! fica R$ 2.500,00 à vista'],
+        ]);
+
+        $this->detector()->detect();
+
+        $lead = Lead::sole();
+        $this->assertSame('iphone', $lead->product_interest);
+        $this->assertEqualsWithDelta(2500.0, $lead->quoted_amount, 0.001);
+    }
+
+    public function test_leaves_product_interest_and_quoted_amount_null_without_any_signal(): void
+    {
+        $this->chat('5534999990031', [['in', -48, 'oi, tudo bem?']]);
+
+        $this->detector()->detect();
+
+        $lead = Lead::sole();
+        $this->assertNull($lead->product_interest);
+        $this->assertNull($lead->quoted_amount);
+    }
+
     public function test_detects_customer_gone_silent_after_we_replied(): void
     {
         $this->chat('5534999990002', [['in', -96], ['out', -95]]);

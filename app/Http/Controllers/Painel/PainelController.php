@@ -26,7 +26,7 @@ class PainelController extends Controller
     /** Valor do filtro ?priority= => rótulo que LeadPriorityScorer::label() devolve. */
     private const PRIORITY_LABELS = ['alta' => 'Alta', 'media' => 'Média', 'baixa' => 'Baixa'];
 
-    public function index(Request $request, LeadPriorityScorer $scorer, SupplierPartsService $parts): View
+    public function index(Request $request, LeadPriorityScorer $scorer, SupplierPartsService $parts): View|JsonResponse
     {
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'reconnect';
         $user = $request->user();
@@ -68,6 +68,16 @@ class PainelController extends Controller
                 ->count(),
         ]);
 
+        $canDecide = (bool) $user->can_decide;
+
+        // Busca ao vivo (JS em index.blade.php): só troca a área de resultados, sem navegar
+        // a página — mesmo padrão já usado em respond() pras ações de linha.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'html' => view('painel.partials.leads-results', ['leads' => $leads, 'canDecide' => $canDecide])->render(),
+            ]);
+        }
+
         return view('painel.index', [
             'leads' => $leads,
             'tab' => $tab,
@@ -77,7 +87,7 @@ class PainelController extends Controller
             'selectedStore' => $storeId,
             'search' => $search,
             'priority' => $priority,
-            'canDecide' => (bool) $user->can_decide,
+            'canDecide' => $canDecide,
             'partsByCategory' => $parts->summaryByCategory(),
         ]);
     }

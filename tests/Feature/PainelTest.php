@@ -385,6 +385,39 @@ class PainelTest extends TestCase
         $this->actingAs($user)->get('/painel?tab=all&store=abc')->assertOk();
     }
 
+    public function test_live_search_with_accept_json_returns_only_the_results_partial(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $this->makeLead($store, 'Gisele', '5534999990099');
+        $this->makeLead($store, 'Outro Cliente', '5534999990088');
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)
+            ->getJson('/painel?tab=all&search=Gisele');
+
+        $response->assertOk();
+        $response->assertJsonStructure(['html']);
+        $html = $response->json('html');
+        $this->assertStringContainsString('Gisele', $html);
+        $this->assertStringNotContainsString('Outro Cliente', $html);
+        // Só o pedaço da tabela, não a página inteira (sem o cabeçalho "CRM WhatsApp").
+        $this->assertStringNotContainsString('CRM WhatsApp', $html);
+    }
+
+    public function test_the_date_column_shows_the_last_contact_instead_of_source(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $lead = $this->makeLead($store, 'Gisele', '5534999990099');
+        $lead->update(['last_contact_at' => '2026-10-10 14:30:00']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->get('/painel?tab=all');
+
+        $response->assertSee('Data');
+        $response->assertDontSee('Origem');
+        $response->assertSee('10/10 14:30');
+    }
+
     public function test_shows_a_banner_when_a_waha_store_is_down(): void
     {
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');

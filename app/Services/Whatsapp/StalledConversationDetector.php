@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\WhatsappChat;
 use App\Services\Leads\FollowupGate;
+use App\Services\Leads\LeadInfoExtractor;
 use Carbon\CarbonImmutable;
 
 /**
@@ -21,7 +22,9 @@ class StalledConversationDetector
     // Nós (ou o bot) respondemos por último e o cliente não voltou a escrever.
     public const REASON_CUSTOMER_SILENT = 'customer_silent';
 
-    public function __construct(private readonly FollowupGate $gate) {}
+    private const MAX_MESSAGES_CONSIDERED = 10;
+
+    public function __construct(private readonly FollowupGate $gate, private readonly LeadInfoExtractor $extractor) {}
 
     /** @return array{leads_created: int, followups_created: int, chats_skipped: int} */
     public function detect(?int $storeId = null): array
@@ -80,11 +83,35 @@ class StalledConversationDetector
         $lead->last_contact_at = $chat->last_message_at;
         $lead->next_contact_at ??= CarbonImmutable::now();
         $lead->whatsapp_chat_id = $chat->id;
+        $this->fillExtractedInfo($lead, $chat);
         $lead->save();
 
         $followupCreated = $this->maybeCreateFollowup($lead, $reason, $lastCustomerMessage->body, $config);
 
         return ['lead_created' => $leadCreated, 'followup_created' => $followupCreated];
+    }
+
+    /**
+     * Preenche product_interest/quoted_amount por regra (App\Services\Leads\LeadInfoExtractor)
+     * — só sobrescreve se achar um valor novo, pra não apagar um orçamento já dado só porque a
+     * conversa seguiu falando de outra coisa depois.
+     */
+    private function fillExtractedInfo(Lead $lead, WhatsappChat $chat): void
+    {
+        $customerMessages = $chat->messages()->where('direction', 'in')
+            ->orderByDesc('sent_at')->limit(self::MAX_MESSAGES_CONSIDERED)->get();
+        $sellerMessages = $chat->messages()->where('direction', 'out')
+            ->orderByDesc('sent_at')->limit(self::MAX_MESSAGES_CONSIDERED)->get();
+
+        $productInterest = $this->extractor->productInterest($customerMessages);
+        if ($productInterest !== null) {
+            $lead->product_interest = $productInterest;
+        }
+
+        $quotedAmount = $this->extractor->quotedAmount($sellerMessages);
+        if ($quotedAmount !== null) {
+            $lead->quoted_amount = $quotedAmount;
+        }
     }
 
     private function findOrCreateCustomer(WhatsappChat $chat): ?Customer

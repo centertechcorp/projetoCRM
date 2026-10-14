@@ -154,6 +154,34 @@ class WahaWebhookTest extends TestCase
         $this->assertNull($media->source_url);
     }
 
+    public function test_a_message_from_a_lid_contact_queues_the_phone_resolution_job(): void
+    {
+        Queue::fake([\App\Jobs\Whatsapp\ResolveWahaChatPhone::class]);
+
+        $this->postSigned($this->lidPayload())->assertStatus(200);
+
+        Queue::assertPushed(\App\Jobs\Whatsapp\ResolveWahaChatPhone::class, 1);
+    }
+
+    public function test_a_normal_phone_contact_does_not_queue_the_phone_resolution_job(): void
+    {
+        Queue::fake([\App\Jobs\Whatsapp\ResolveWahaChatPhone::class]);
+
+        $this->postSigned($this->payload())->assertStatus(200);
+
+        Queue::assertNotPushed(\App\Jobs\Whatsapp\ResolveWahaChatPhone::class);
+    }
+
+    public function test_a_second_message_from_the_same_unresolved_lid_contact_does_not_queue_again(): void
+    {
+        Queue::fake([\App\Jobs\Whatsapp\ResolveWahaChatPhone::class]);
+
+        $this->postSigned($this->lidPayload('MSG1'))->assertStatus(200);
+        $this->postSigned($this->lidPayload('MSG2'))->assertStatus(200);
+
+        Queue::assertPushed(\App\Jobs\Whatsapp\ResolveWahaChatPhone::class, 1);
+    }
+
     public function test_non_message_events_like_session_status_are_accepted_but_store_nothing(): void
     {
         $body = json_encode(['event' => 'session.status', 'session' => 'CENTER', 'payload' => ['status' => 'WORKING']]);
@@ -175,6 +203,22 @@ class WahaWebhookTest extends TestCase
                 'body' => 'oi, chegou?',
                 'timestamp' => 1760000000,
                 '_data' => ['type' => 'chat', 'notifyName' => 'Cliente Teste'],
+            ],
+        ]);
+    }
+
+    private function lidPayload(string $suffix = 'MSG1'): string
+    {
+        return json_encode([
+            'event' => 'message',
+            'session' => 'CENTER',
+            'payload' => [
+                'id' => "true_234982123540724@lid_{$suffix}",
+                'from' => '234982123540724@lid',
+                'fromMe' => false,
+                'body' => 'oi',
+                'timestamp' => 1760000000,
+                '_data' => ['type' => 'chat', 'notifyName' => 'Contato Lid'],
             ],
         ]);
     }

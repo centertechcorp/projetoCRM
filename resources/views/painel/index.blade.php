@@ -66,17 +66,17 @@
     </div>
 @endif
 
-<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-    <nav class="flex flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm dark:bg-slate-800/60">
+<div class="mb-6 flex flex-nowrap items-center justify-between gap-4">
+    <nav class="flex min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg bg-slate-200/60 p-1 text-sm dark:bg-slate-800/60">
         @foreach ($tabs as $t)
             <a href="{{ route('painel.index', ['tab' => $t, 'store' => $selectedStore, 'search' => $search, 'priority' => $priority]) }}"
-                class="rounded-md px-3 py-1.5 font-medium {{ $tab === $t ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100' }}">
+                class="whitespace-nowrap rounded-md px-3 py-1.5 font-medium {{ $tab === $t ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100' }}">
                 {{ $tabLabel[$t] }} <span class="text-slate-400 dark:text-slate-500">({{ $counts[$t] }})</span>
             </a>
         @endforeach
     </nav>
 
-    <div class="flex items-center gap-2">
+    <div class="flex flex-shrink-0 items-center gap-2">
         <form method="GET" class="text-sm">
             <input type="hidden" name="tab" value="{{ $tab }}">
             <input type="hidden" name="store" value="{{ $selectedStore }}">
@@ -86,7 +86,7 @@
         </form>
 
         <a href="{{ route('painel.report', ['store' => $selectedStore]) }}"
-            class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            class="whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
             Relatório do dia
         </a>
 
@@ -123,32 +123,9 @@
     </form>
 </div>
 
-@if ($leads->isEmpty())
-    <p class="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-        Nenhum lead nesta aba ainda.
-    </p>
-@else
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-            <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                <tr>
-                    <th class="px-4 py-1.5">Cliente</th>
-                    <th class="px-4 py-1.5">Loja</th>
-                    <th class="px-4 py-1.5">Produto / Orçamento</th>
-                    <th class="px-4 py-1.5">Origem · Atendente</th>
-                    <th class="px-4 py-1.5">Próximo contato</th>
-                    <th class="px-4 py-1.5">Sugestão de reabordagem</th>
-                    <th class="px-4 py-1.5">Ações</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                @foreach ($leads as $lead)
-                    @include('painel.partials.lead-row', ['lead' => $lead, 'canDecide' => $canDecide])
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-@endif
+<div id="leadsResults">
+    @include('painel.partials.leads-results', ['leads' => $leads, 'canDecide' => $canDecide])
+</div>
 
 <div class="mt-6">
     @include('painel.partials.business-rules')
@@ -159,18 +136,36 @@
 
     (function () {
         const input = document.getElementById('leadSearchInput');
+        const results = document.getElementById('leadsResults');
 
-        if (!input) {
+        if (!input || !results) {
             return;
         }
 
-        input.addEventListener('input', function () {
-            const term = input.value.trim().toLowerCase();
+        let debounceTimer;
 
-            document.querySelectorAll('[data-lead-search]').forEach(function (row) {
-                row.style.display = row.dataset.leadSearch.includes(term) ? '' : 'none';
-            });
+        input.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(liveSearch, 400);
         });
+
+        function liveSearch() {
+            const params = new URLSearchParams(new FormData(input.form));
+            // Não usa input.form.action aqui — sem um "action" explícito no <form>, ele
+            // resolve pra URL atual JÁ COM a query string antiga, o que duplicaria os
+            // parâmetros (ex.: "...?tab=x?tab=y"). window.location.pathname é só "/painel".
+            const url = window.location.pathname + '?' + params.toString();
+
+            fetch(url, { headers: { Accept: 'application/json' } })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    results.innerHTML = data.html;
+                    bindCopyButtons(results);
+                    bindTooltips(results);
+                    results.querySelectorAll('form.js-row-action').forEach(bindRowAction);
+                    history.replaceState(null, '', url);
+                });
+        }
     })();
 
     function bindCopyButtons(scope) {

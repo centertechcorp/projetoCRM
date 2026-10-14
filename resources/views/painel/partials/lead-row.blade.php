@@ -27,7 +27,7 @@
     ];
     $priorityIcon = ['Alta' => '🔥', 'Média' => '🟡', 'Baixa' => '⚪'];
 @endphp
-<tr class="align-top" data-lead-row="{{ $lead->id }}" data-lead-search="{{ mb_strtolower($lead->customer->name.' '.$lead->customer->phone.' '.$lead->product_interest) }}">
+<tr class="align-top" data-lead-row="{{ $lead->id }}">
     <td class="px-4 py-3">
         <div class="font-medium text-slate-900 dark:text-slate-100">{{ $lead->customer->name ?: '(sem nome)' }}</div>
         <div class="text-slate-500 dark:text-slate-400">{{ $lead->customer->phone }}</div>
@@ -45,10 +45,7 @@
         @endif
     </td>
     <td class="px-4 py-3 text-slate-500 dark:text-slate-400">
-        {{ $lead->source }}@if ($lead->attended_by_label) · {{ $lead->attended_by_label }} @endif
-    </td>
-    <td class="px-4 py-3 text-slate-500 dark:text-slate-400">
-        {{ $lead->next_contact_at?->format('d/m H:i') ?? '—' }}
+        {{ $lead->last_contact_at?->format('d/m H:i') ?? '—' }}
     </td>
     <td class="px-4 py-3">
         <div class="mb-1 flex items-center gap-1.5">

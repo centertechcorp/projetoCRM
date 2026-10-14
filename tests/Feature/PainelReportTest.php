@@ -66,6 +66,45 @@ class PainelReportTest extends TestCase
         $this->actingAs($user)->get('/painel/relatorio?store=abc')->assertOk();
     }
 
+    public function test_searching_finds_a_contact_from_a_different_day(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $chat = $this->makeChat($account, 'Gisele', '5534999990099');
+        $this->makeMessage($account, $chat, 'in', 'oi, tudo bem?', now()->subDays(3));
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        // Vendo o dia de hoje sem busca, a mensagem de 3 dias atrás não aparece.
+        $this->actingAs($user)->get('/painel/relatorio')->assertDontSee('Gisele');
+
+        // Buscando pelo nome, aparece mesmo não sendo hoje — "se tá no banco, tem que aparecer".
+        $response = $this->actingAs($user)->get('/painel/relatorio?search=Gisele');
+        $response->assertOk();
+        $response->assertSee('Gisele');
+        $response->assertSee('buscando em todos os dias');
+    }
+
+    public function test_live_search_with_accept_json_returns_only_the_results_partial(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $chat = $this->makeChat($account, 'Gisele', '5534999990099');
+        $this->makeMessage($account, $chat, 'in', 'oi, tudo bem?', now()->subDays(3));
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->getJson('/painel/relatorio?search=Gisele');
+
+        $response->assertOk();
+        $response->assertJsonStructure(['html']);
+        $html = $response->json('html');
+        $this->assertStringContainsString('Gisele', $html);
+        $this->assertStringContainsString('buscando em todos os dias', $html);
+        // Só o pedaço dos resultados, não a página inteira (sem o cabeçalho "CRM WhatsApp").
+        $this->assertStringNotContainsString('CRM WhatsApp', $html);
+    }
+
     public function test_group_messages_never_appear_in_the_report(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);

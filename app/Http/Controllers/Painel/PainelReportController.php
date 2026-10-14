@@ -8,12 +8,13 @@ use App\Models\WhatsappMessage;
 use App\Services\Leads\LeadPriorityScorer;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class PainelReportController extends Controller
 {
-    public function index(Request $request, LeadPriorityScorer $scorer): View
+    public function index(Request $request, LeadPriorityScorer $scorer): View|JsonResponse
     {
         $user = $request->user();
 
@@ -29,7 +30,9 @@ class PainelReportController extends Controller
 
         $messages = WhatsappMessage::query()
             ->whereHas('chat', fn ($q) => $q->where('kind', 'individual'))
-            ->whereBetween('sent_at', [$date, $date->endOfDay()])
+            // Buscando, o contato tem que aparecer independente do dia — "se tá no banco, tem
+            // que aparecer" — então só restringe pelo dia selecionado quando não há busca.
+            ->when($search === '', fn ($q) => $q->whereBetween('sent_at', [$date, $date->endOfDay()]))
             ->with(['chat', 'account.store'])
             ->when($storeId, fn ($q) => $q->whereHas('account', fn ($a) => $a->where('store_id', $storeId)))
             ->when($search !== '', fn ($q) => $q->whereHas('chat', fn (Builder $c) => $c
@@ -71,6 +74,17 @@ class PainelReportController extends Controller
         $conversations = $ranked
             ? $conversations->sortByDesc('score')->values()
             : $conversations->sortByDesc('last_sent_at')->values();
+
+        // Busca ao vivo (JS em report.blade.php): só troca a área de resultados, sem navegar
+        // a página — mesmo padrão já usado no painel principal.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'html' => view('painel.partials.report-results', [
+                    'search' => $search, 'date' => $date, 'summary' => $summary,
+                    'messages' => $messages, 'conversations' => $conversations, 'ranked' => $ranked,
+                ])->render(),
+            ]);
+        }
 
         return view('painel.report', [
             'date' => $date,

@@ -3,6 +3,7 @@
 namespace App\Services\Whatsapp;
 
 use App\Jobs\Whatsapp\DownloadWahaMedia;
+use App\Jobs\Whatsapp\ResolveWahaChatPhone;
 use App\Models\Event;
 use App\Models\WhatsappAccount;
 use App\Models\WhatsappChat;
@@ -10,6 +11,7 @@ use App\Models\WhatsappGroupMessage;
 use App\Models\WhatsappMedia;
 use App\Models\WhatsappMessage;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -71,7 +73,7 @@ class MessageRecorder
         $result = self::STORED;
 
         DB::transaction(function () use ($account, $message, $source, $payload, $chatKey, &$result): void {
-            $sentAt = CarbonImmutable::createFromTimestamp($message->timestamp);
+            $sentAt = CarbonImmutable::createFromTimestamp($message->timestamp, config('app.timezone'));
             $chat = $this->chatFor($account, $message, $chatKey, $sentAt);
 
             // Mesma regra do grupo: chat marcado como ignorado (whatsapp:chats:ignore) não
@@ -119,7 +121,7 @@ class MessageRecorder
      */
     private function recordGroupMessage(WhatsappAccount $account, IncomingMessage $message, string $chatKey): string
     {
-        $sentAt = CarbonImmutable::createFromTimestamp($message->timestamp);
+        $sentAt = CarbonImmutable::createFromTimestamp($message->timestamp, config('app.timezone'));
         $result = self::IGNORED;
 
         DB::transaction(function () use ($account, $message, $chatKey, $sentAt, &$result): void {
@@ -206,6 +208,15 @@ class MessageRecorder
 
         if ($changes !== []) {
             $chat->update($changes);
+        }
+
+        // "@lid" é o identificador de privacidade que o WhatsApp vem usando pra alguns contatos
+        // individuais — o webhook não traz o telefone real nesse caso (ver chatFor() acima), mas
+        // o WAHA consegue resolver via GET /api/contacts. Trava por 10 min pra não despachar um
+        // job por mensagem numa conversa rápida com o mesmo contato ainda não resolvido.
+        if (! $isGroup && $chat->phone === null && str_ends_with($message->chat, '@lid')
+            && Cache::add("waha_resolve_attempted:{$chat->id}", true, now()->addMinutes(10))) {
+            ResolveWahaChatPhone::dispatch($chat->id);
         }
 
         return $chat;

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\Whatsapp\ResolveWahaChatPhone;
 use App\Models\Event;
 use App\Models\Store;
 use App\Models\WhatsappAccount;
@@ -16,6 +17,7 @@ use App\Services\Whatsapp\MessageRecorder;
 use App\Services\Whatsapp\MessageStore;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WhatsappRecorderTest extends TestCase
@@ -181,9 +183,14 @@ class WhatsappRecorderTest extends TestCase
 
     public function test_lid_chat_has_no_phone(): void
     {
+        // A resolução de verdade é assíncrona (App\Jobs\Whatsapp\ResolveWahaChatPhone, testado
+        // à parte em ResolveWahaChatPhoneTest) — aqui só interessa o estado logo após gravar.
+        Queue::fake([ResolveWahaChatPhone::class]);
+
         $this->recorder()->record($this->account, $this->message(chat: '113404366831863@lid'), 'web_extension');
 
         $this->assertNull(WhatsappChat::sole()->phone);
+        Queue::assertPushed(ResolveWahaChatPhone::class);
     }
 
     public function test_own_messages_do_not_rename_the_contact(): void
