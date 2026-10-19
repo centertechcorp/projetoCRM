@@ -11,6 +11,7 @@ use App\Models\WhatsappChat;
 use App\Models\WhatsappMessage;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -261,6 +262,119 @@ class PainelReportTest extends TestCase
 
         $this->actingAs($seller)->post("/painel/chats/{$chat->id}/ignore")->assertForbidden();
         $this->assertFalse($chat->fresh()->ignored);
+    }
+
+    public function test_guest_is_redirected_to_login_for_actions_summary(): void
+    {
+        $this->get('/painel/relatorio/acoes')->assertRedirect('/login');
+    }
+
+    public function test_actions_summary_counts_each_outcome_inside_the_date_range_and_excludes_outside(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+
+        $openIn = $this->makeLead($center, 'Open In', 'open');
+        $this->forceLeadDate($openIn, 'created_at', '2026-10-05 10:00:00');
+
+        $openOut = $this->makeLead($center, 'Open Out', 'open');
+        $this->forceLeadDate($openOut, 'created_at', '2026-09-15 10:00:00');
+
+        $wonIn = $this->makeLead($center, 'Won In', 'won', ['won_at' => '2026-10-10 23:50:00']);
+        $wonOut = $this->makeLead($center, 'Won Out', 'won', ['won_at' => '2026-10-15 10:00:00']);
+
+        $lostIn = $this->makeLead($center, 'Lost In', 'lost', ['lost_at' => '2026-10-01 00:05:00']);
+        $lostOut = $this->makeLead($center, 'Lost Out', 'lost', ['lost_at' => '2026-09-01 10:00:00']);
+
+        $deletedIn = $this->makeLead($center, 'Deleted In', 'open');
+        $deletedIn->delete();
+        $this->forceLeadDate($deletedIn, 'deleted_at', '2026-10-07 12:00:00');
+
+        $deletedOut = $this->makeLead($center, 'Deleted Out', 'open');
+        $deletedOut->delete();
+        $this->forceLeadDate($deletedOut, 'deleted_at', '2026-09-20 12:00:00');
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->getJson('/painel/relatorio/acoes?from=2026-10-01&to=2026-10-10');
+
+        $response->assertOk();
+        $response->assertJson([
+            'labels' => ['Em aberto', 'Comprou', 'Perdeu', 'Deletado/Ignorado'],
+            'counts' => [1, 1, 1, 1],
+        ]);
+    }
+
+    public function test_actions_summary_falls_back_gracefully_on_invalid_dates(): void
+    {
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->getJson('/painel/relatorio/acoes?from=data-invalida&to=tambem-invalida');
+
+        $response->assertOk();
+        $response->assertJsonStructure(['labels', 'counts']);
+        $this->assertCount(4, $response->json('counts'));
+    }
+
+    public function test_seller_only_sees_their_own_store_in_actions_summary(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $genius = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+
+        $centerLead = $this->makeLead($center, 'Cliente Center', 'open');
+        $this->forceLeadDate($centerLead, 'created_at', '2026-10-05 10:00:00');
+
+        $geniusLead = $this->makeLead($genius, 'Cliente Genius', 'open');
+        $this->forceLeadDate($geniusLead, 'created_at', '2026-10-05 10:00:00');
+
+        $seller = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'seller', $center->id);
+
+        $response = $this->actingAs($seller)->getJson('/painel/relatorio/acoes?from=2026-10-01&to=2026-10-10');
+
+        $response->assertOk();
+        $response->assertJson(['counts' => [1, 0, 0, 0]]);
+    }
+
+    public function test_owner_can_filter_actions_summary_by_store_param(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $genius = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+
+        $centerLead = $this->makeLead($center, 'Cliente Center', 'open');
+        $this->forceLeadDate($centerLead, 'created_at', '2026-10-05 10:00:00');
+
+        $geniusLead = $this->makeLead($genius, 'Cliente Genius', 'open');
+        $this->forceLeadDate($geniusLead, 'created_at', '2026-10-05 10:00:00');
+
+        $owner = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($owner)
+            ->getJson("/painel/relatorio/acoes?from=2026-10-01&to=2026-10-10&store={$genius->id}");
+
+        $response->assertOk();
+        $response->assertJson(['counts' => [1, 0, 0, 0]]);
+    }
+
+    /** @param  array<string, mixed>  $extra */
+    private function makeLead(Store $store, string $customerName, string $status, array $extra = []): Lead
+    {
+        static $counter = 0;
+        $counter++;
+
+        $customer = Customer::create(['name' => $customerName, 'phone' => '55349999'.str_pad((string) $counter, 4, '0', STR_PAD_LEFT)]);
+
+        return Lead::create(array_merge([
+            'customer_id' => $customer->id,
+            'store_id' => $store->id,
+            'source' => 'whatsapp',
+            'status' => $status,
+        ], $extra));
+    }
+
+    private function forceLeadDate(Lead $lead, string $column, string $value): void
+    {
+        // Contorna o SoftDeletingScope (que filtraria a linha do próprio UPDATE se já tiver
+        // sido deletada) e evita timestamps automáticos do Eloquent sobrescreverem o valor.
+        DB::table('leads')->where('id', $lead->id)->update([$column => $value]);
     }
 
     private function makeUser(string $email, string $password, string $role = 'owner', ?int $storeId = null): User

@@ -21,14 +21,14 @@ class PainelController extends Controller
     /** Status ativos de uma sugestão de reabordagem (ainda não decidida). */
     private const OPEN_FOLLOWUP_STATUSES = ['candidate', 'draft_ready', 'approved'];
 
-    private const TABS = ['ongoing', 'reconnect', 'won', 'lost', 'all'];
+    private const TABS = ['all', 'reconnect', 'won', 'lost', 'ongoing'];
 
     /** Valor do filtro ?priority= => rótulo que LeadPriorityScorer::label() devolve. */
     private const PRIORITY_LABELS = ['alta' => 'Alta', 'media' => 'Média', 'baixa' => 'Baixa'];
 
     public function index(Request $request, LeadPriorityScorer $scorer, SupplierPartsService $parts): View|JsonResponse
     {
-        $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'reconnect';
+        $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all';
         $user = $request->user();
 
         $storeId = $user->isSeller() ? $user->store_id : $request->query('store');

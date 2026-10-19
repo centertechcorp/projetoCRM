@@ -114,6 +114,58 @@ class PainelReportController extends Controller
             'search' => $search,
             'ranked' => $ranked,
             'canDecide' => $canDecide,
+            'chartDefaultFrom' => $date->subDays(6)->toDateString(),
+            'chartDefaultTo' => $date->toDateString(),
+        ]);
+    }
+
+    /**
+     * Gráfico de rosca "Ações no período" do Relatório do dia: conta, pelo intervalo de datas
+     * escolhido (data início/fim), quantos leads entraram em cada desfecho. Cada categoria usa
+     * a data da própria ação (won_at/lost_at/deleted_at), exceto "Em aberto" (sem ação ainda),
+     * que usa a data de criação do lead — não tem outra data pra contar ali.
+     */
+    public function actionsSummary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        try {
+            $from = CarbonImmutable::parse($request->query('from'))->startOfDay();
+        } catch (\Exception) {
+            $from = CarbonImmutable::now()->subDays(6)->startOfDay();
+        }
+
+        try {
+            $to = CarbonImmutable::parse($request->query('to'))->endOfDay();
+        } catch (\Exception) {
+            $to = CarbonImmutable::now()->endOfDay();
+        }
+
+        $storeId = $user->isSeller() ? $user->store_id : $request->query('store');
+        $storeId = is_numeric($storeId) ? (int) $storeId : null;
+
+        $base = Lead::withTrashed()->when($storeId, fn ($q) => $q->where('store_id', $storeId));
+
+        $open = (clone $base)->whereNull('deleted_at')
+            ->where('status', 'open')
+            ->whereBetween('created_at', [$from, $to])
+            ->count();
+
+        $won = (clone $base)->whereNotNull('won_at')
+            ->whereBetween('won_at', [$from, $to])
+            ->count();
+
+        $lost = (clone $base)->whereNotNull('lost_at')
+            ->whereBetween('lost_at', [$from, $to])
+            ->count();
+
+        $deleted = (clone $base)->onlyTrashed()
+            ->whereBetween('deleted_at', [$from, $to])
+            ->count();
+
+        return response()->json([
+            'labels' => ['Em aberto', 'Comprou', 'Perdeu', 'Deletado/Ignorado'],
+            'counts' => [$open, $won, $lost, $deleted],
         ]);
     }
 

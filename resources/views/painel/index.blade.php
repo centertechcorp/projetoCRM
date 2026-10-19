@@ -4,11 +4,11 @@
 
 @php
     $tabLabel = [
-        'ongoing' => 'Em andamento',
+        'all' => 'Todos',
         'reconnect' => 'Reconectar',
         'won' => 'Pós-venda',
         'lost' => 'Desistiu',
-        'all' => 'Todos',
+        'ongoing' => 'Em andamento',
     ];
 @endphp
 

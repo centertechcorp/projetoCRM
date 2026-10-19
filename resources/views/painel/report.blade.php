@@ -47,6 +47,29 @@
     ])
 </div>
 
+<div class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Ações no período</h2>
+        <div class="flex items-center gap-2 text-sm">
+            <label class="text-slate-500 dark:text-slate-400">De
+                <input type="date" id="actionsFrom" value="{{ $chartDefaultFrom }}"
+                    class="ml-1 rounded-lg border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            </label>
+            <label class="text-slate-500 dark:text-slate-400">até
+                <input type="date" id="actionsTo" value="{{ $chartDefaultTo }}"
+                    class="ml-1 rounded-lg border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            </label>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-6">
+        <div class="h-56 w-56 flex-shrink-0">
+            <canvas id="actionsDonutChart"></canvas>
+        </div>
+        <ul id="actionsLegend" class="flex-1 space-y-2 text-sm"></ul>
+    </div>
+</div>
+
 <script>
     let flashHideTimer;
 
@@ -87,6 +110,76 @@
 
     bindCopyButtons(document);
     bindConfirmDelete(document);
+
+    document.addEventListener('DOMContentLoaded', setupActionsChart);
+
+    function setupActionsChart() {
+        const canvas = document.getElementById('actionsDonutChart');
+
+        if (!canvas || !window.Chart) {
+            return;
+        }
+
+        const fromInput = document.getElementById('actionsFrom');
+        const toInput = document.getElementById('actionsTo');
+        const legend = document.getElementById('actionsLegend');
+        const storeSelect = document.querySelector('select[name="store"]');
+        const colors = ['#94a3b8', '#10b981', '#ef4444', '#8b5cf6'];
+        let chart = null;
+
+        function load() {
+            const params = new URLSearchParams({ from: fromInput.value, to: toInput.value });
+
+            if (storeSelect && storeSelect.value) {
+                params.set('store', storeSelect.value);
+            }
+
+            fetch('{{ route('painel.report.actions') }}?' + params.toString(), { headers: { Accept: 'application/json' } })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    const total = data.counts.reduce(function (a, b) { return a + b; }, 0);
+
+                    if (chart) {
+                        chart.data.labels = data.labels;
+                        chart.data.datasets[0].data = data.counts;
+                        chart.update();
+                    } else {
+                        chart = new Chart(canvas, {
+                            type: 'doughnut',
+                            data: {
+                                labels: data.labels,
+                                datasets: [{ data: data.counts, backgroundColor: colors, borderWidth: 0 }],
+                            },
+                            options: {
+                                cutout: '65%',
+                                plugins: { legend: { display: false } },
+                            },
+                        });
+                    }
+
+                    legend.innerHTML = data.labels.map(function (label, i) {
+                        const count = data.counts[i];
+                        const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+
+                        return '<li class="flex items-center gap-2">'
+                            + '<span class="h-2.5 w-2.5 rounded-full" style="background:' + colors[i] + '"></span>'
+                            + '<span class="text-slate-700 dark:text-slate-300">' + label + '</span>'
+                            + '<span class="ml-auto font-medium text-slate-900 dark:text-slate-100">' + count + '</span>'
+                            + '<span class="w-14 text-right text-slate-400 dark:text-slate-500">(' + pct + '%)</span>'
+                            + '</li>';
+                    }).join('');
+                });
+        }
+
+        fromInput.addEventListener('change', load);
+        toInput.addEventListener('change', load);
+
+        if (storeSelect) {
+            storeSelect.addEventListener('change', load);
+        }
+
+        load();
+    }
 
     (function () {
         const input = document.getElementById('reportSearchInput');
