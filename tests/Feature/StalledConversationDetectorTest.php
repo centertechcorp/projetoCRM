@@ -78,6 +78,53 @@ class StalledConversationDetectorTest extends TestCase
         $this->assertNull($lead->quoted_amount);
     }
 
+    public function test_fills_product_category_as_celular_from_a_phone_brand_mention(): void
+    {
+        $this->chat('5534999990032', [['in', -48, 'oi, queria saber sobre o galaxy s24']]);
+
+        $this->detector()->detect();
+
+        $this->assertSame('celular', Lead::sole()->product_category);
+    }
+
+    public function test_fills_product_category_as_peca_for_an_accessory_mentioning_a_brand(): void
+    {
+        $this->chat('5534999990034', [['in', -48, 'tem capinha de iphone?']]);
+
+        $this->detector()->detect();
+
+        $this->assertSame('peca', Lead::sole()->product_category);
+    }
+
+    public function test_fills_product_category_as_celular_for_a_price_question_about_a_brand(): void
+    {
+        // Mesmo bug relatado pelo Caio (resumo anterior), agora testado na ponta a ponta:
+        // detector -> LeadInfoExtractor -> banco, não só o extrator isolado.
+        $this->chat('5534999990035', [['in', -48, 'qual o preço do iphone']]);
+
+        $this->detector()->detect();
+
+        $this->assertSame('celular', Lead::sole()->product_category);
+    }
+
+    public function test_a_locked_product_category_is_not_overwritten_by_a_new_detection_cycle(): void
+    {
+        $chat = $this->chat('5534999990033', [['in', -48, 'oi, queria saber sobre o iphone']]);
+        $this->detector()->detect();
+
+        $lead = Lead::sole();
+        $this->assertSame('celular', $lead->product_category);
+
+        // Simula a correção manual (painel.leads.category): trava em "peca" mesmo a
+        // conversa citando uma marca de celular.
+        $lead->update(['product_category' => 'peca', 'product_category_locked' => true]);
+
+        $this->message($chat, 'in', -1, '5534999990033-locked', 'e tem capinha tb?');
+        $this->detector()->detect();
+
+        $this->assertSame('peca', $lead->fresh()->product_category);
+    }
+
     public function test_detects_customer_gone_silent_after_we_replied(): void
     {
         $this->chat('5534999990002', [['in', -96], ['out', -95]]);

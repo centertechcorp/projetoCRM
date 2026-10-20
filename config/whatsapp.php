@@ -157,6 +157,15 @@ return [
     ],
 
     'group_topics' => [
+        // Usado pelo filtro "Celular x Peças" do painel (LeadInfoExtractor::productCategory).
+        // Só marca/modelo de celular de verdade — ipad/apple watch/notebook/tablet ficam de
+        // fora de propósito (não são celular), mesmo aparecendo em "keywords" abaixo.
+        'phone_keywords' => [
+            'iphone', 'samsung', 'galaxy', 'xiaomi', 'redmi', 'poco', 'motorola', 'moto g',
+            'moto e', 'asus', 'lg', 'huawei', 'honor', 'realme', 'oneplus', 'nokia', 'lenovo',
+            'positivo', 'multilaser', 'celular', 'smartphone',
+        ],
+
         // Ordem importa pro LeadInfoExtractor: ele usa a primeira palavra que bater na
         // mensagem, então termos específicos (marca/modelo) vêm antes dos genéricos
         // ("celular", "smartphone", "eletronico") — senão "esse celular samsung" vira

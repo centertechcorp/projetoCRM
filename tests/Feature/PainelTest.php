@@ -59,7 +59,7 @@ class PainelTest extends TestCase
         $this->makeLead($center, 'Cliente Center', '5534999990001');
         $this->makeLead($genius, 'Cliente Genius', '5534999990002');
 
-        $response = $this->actingAs($seller)->get('/painel?tab=all');
+        $response = $this->actingAs($seller)->get('/painel?tab=ongoing');
 
         $response->assertSee('Cliente Center');
         $response->assertDontSee('Cliente Genius');
@@ -74,7 +74,7 @@ class PainelTest extends TestCase
         $this->makeLead($center, 'Cliente Center', '5534999990003');
         $this->makeLead($genius, 'Cliente Genius', '5534999990004');
 
-        $response = $this->actingAs($manager)->get('/painel?tab=all');
+        $response = $this->actingAs($manager)->get('/painel?tab=ongoing');
 
         $response->assertSee('Cliente Center');
         $response->assertSee('Cliente Genius');
@@ -317,7 +317,7 @@ class PainelTest extends TestCase
         $this->assertTrue($chat->fresh()->ignored);
         $this->assertNotNull($lead->fresh()->deleted_at);
         $this->assertSame(0, Lead::count());
-        $this->actingAs($user)->get('/painel?tab=all')->assertDontSee('5534999990013');
+        $this->actingAs($user)->get('/painel?tab=ongoing')->assertDontSee('5534999990013');
     }
 
     public function test_deleting_a_lead_without_a_linked_chat_does_not_error(): void
@@ -329,6 +329,47 @@ class PainelTest extends TestCase
         $response = $this->actingAs($user)->postJson(route('painel.leads.delete', $lead));
 
         $response->assertOk()->assertJson(['deleted' => true]);
+        $this->assertNotNull($lead->fresh()->deleted_at);
+    }
+
+    public function test_restoring_a_deleted_lead_undoes_the_soft_delete_and_the_chat_flag(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $account = WhatsappAccount::create(['store_id' => $store->id, 'label' => 'Conta', 'provider' => 'web_extension']);
+        $chat = WhatsappChat::create([
+            'whatsapp_account_id' => $account->id, 'chat_key' => '5534999990015',
+            'jid' => '5534999990015@c.us', 'kind' => 'individual', 'phone' => '5534999990015',
+        ]);
+        $customer = Customer::create(['phone' => '5534999990015', 'name' => 'Gisele']);
+        $lead = Lead::create([
+            'customer_id' => $customer->id, 'store_id' => $store->id, 'status' => 'open',
+            'whatsapp_chat_id' => $chat->id,
+        ]);
+
+        $this->actingAs($user)->postJson(route('painel.leads.delete', $lead))->assertOk();
+        $this->assertNotNull($lead->fresh()->deleted_at);
+        $this->assertTrue($chat->fresh()->ignored);
+
+        $response = $this->actingAs($user)->postJson(route('painel.leads.restore', $lead));
+
+        $response->assertOk()->assertJsonStructure(['message', 'row']);
+        $this->assertNull($lead->fresh()->deleted_at);
+        $this->assertFalse($chat->fresh()->ignored);
+        $this->actingAs($user)->get('/painel?tab=ongoing')->assertSee('Gisele');
+    }
+
+    public function test_a_seller_cannot_restore_a_lead_from_another_store(): void
+    {
+        $ownStore = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $otherStore = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+        $owner = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $seller = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'seller', $ownStore->id);
+        $lead = $this->makeLead($otherStore, 'Cliente da Genius', '5534999990021');
+
+        $this->actingAs($owner)->postJson(route('painel.leads.delete', $lead))->assertOk();
+
+        $this->actingAs($seller)->post(route('painel.leads.restore', $lead))->assertForbidden();
         $this->assertNotNull($lead->fresh()->deleted_at);
     }
 
@@ -382,7 +423,78 @@ class PainelTest extends TestCase
         Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
-        $this->actingAs($user)->get('/painel?tab=all&store=abc')->assertOk();
+        $this->actingAs($user)->get('/painel?tab=ongoing&store=abc')->assertOk();
+    }
+
+    public function test_category_filter_shows_only_leads_of_the_selected_category(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $celular = $this->makeLead($store, 'Cliente Celular', '5534999990040');
+        $celular->update(['product_category' => 'celular']);
+
+        $peca = $this->makeLead($store, 'Cliente Peça', '5534999990041');
+        $peca->update(['product_category' => 'peca']);
+
+        $this->actingAs($user)->get('/painel?tab=ongoing&category=celular')
+            ->assertSee('Cliente Celular')->assertDontSee('Cliente Peça');
+
+        $this->actingAs($user)->get('/painel?tab=ongoing&category=peca')
+            ->assertSee('Cliente Peça')->assertDontSee('Cliente Celular');
+    }
+
+    public function test_correcting_the_category_by_hand_locks_it_against_the_next_detection_cycle(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+        $lead = $this->makeLead($store, 'Cliente', '5534999990042');
+        $lead->update(['product_category' => 'celular']);
+
+        $response = $this->actingAs($user)->postJson(route('painel.leads.category', $lead), ['category' => 'peca']);
+
+        $response->assertOk()->assertJsonStructure(['message', 'row']);
+        $lead->refresh();
+        $this->assertSame('peca', $lead->product_category);
+        $this->assertTrue($lead->product_category_locked);
+    }
+
+    public function test_the_category_select_reflects_the_leads_saved_category(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+        $lead = $this->makeLead($store, 'Cliente', '5534999990044');
+        $lead->update(['product_category' => 'celular']);
+
+        $html = $this->actingAs($user)->get('/painel?tab=ongoing')->getContent();
+
+        $this->assertStringContainsString('<option value="celular" selected', $html);
+    }
+
+    public function test_clearing_the_category_sets_it_back_to_null_and_still_locks_it(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+        $lead = $this->makeLead($store, 'Cliente', '5534999990045');
+        $lead->update(['product_category' => 'celular']);
+
+        $response = $this->actingAs($user)->postJson(route('painel.leads.category', $lead), ['category' => '']);
+
+        $response->assertOk();
+        $lead->refresh();
+        $this->assertNull($lead->product_category);
+        $this->assertTrue($lead->product_category_locked);
+    }
+
+    public function test_a_seller_cannot_correct_the_category_of_a_lead_from_another_store(): void
+    {
+        $ownStore = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $otherStore = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+        $seller = $this->makeUser('vendedor3@center.com', 'senha-boa-123', 'seller', $ownStore->id);
+        $lead = $this->makeLead($otherStore, 'Cliente da Genius', '5534999990043');
+
+        $this->actingAs($seller)->post(route('painel.leads.category', $lead), ['category' => 'peca'])->assertForbidden();
+        $this->assertNull($lead->fresh()->product_category);
     }
 
     public function test_live_search_with_accept_json_returns_only_the_results_partial(): void
@@ -393,7 +505,7 @@ class PainelTest extends TestCase
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
         $response = $this->actingAs($user)
-            ->getJson('/painel?tab=all&search=Gisele');
+            ->getJson('/painel?tab=ongoing&search=Gisele');
 
         $response->assertOk();
         $response->assertJsonStructure(['html']);
@@ -411,7 +523,7 @@ class PainelTest extends TestCase
         $lead->update(['last_contact_at' => '2026-10-10 14:30:00']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
-        $response = $this->actingAs($user)->get('/painel?tab=all');
+        $response = $this->actingAs($user)->get('/painel?tab=ongoing');
 
         $response->assertSee('Data');
         $response->assertDontSee('Origem');

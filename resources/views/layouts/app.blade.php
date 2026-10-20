@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'CRM') — CENTER TECH</title>
     <script>
         (function () {
@@ -22,6 +23,8 @@
             <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
                 <a href="{{ route('painel.index') }}" class="font-semibold tracking-tight">CRM WhatsApp</a>
                 <div class="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+                    @yield('header-actions')
+
                     <button type="button" id="themeToggle" aria-label="Alternar tema claro/escuro"
                         class="rounded-lg border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                         <svg class="h-4 w-4 dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -53,8 +56,16 @@
             @endif
         @endauth
 
-        <div id="flashStatus" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 {{ session('status') ? '' : 'hidden' }}">
-            {{ session('status') }}
+        <div id="flashStatus" class="mb-4 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 {{ session('status') ? '' : 'hidden' }}">
+            <span>{{ session('status') }}</span>
+            @if (session('status_undo'))
+                <form method="POST" action="{{ session('status_undo.url') }}" class="shrink-0">
+                    @csrf
+                    <button type="submit" class="whitespace-nowrap rounded-full border border-emerald-400 px-2.5 py-1 text-xs font-semibold hover:bg-emerald-100 dark:border-emerald-700 dark:hover:bg-emerald-900">
+                        {{ session('status_undo.label') }}
+                    </button>
+                </form>
+            @endif
         </div>
 
         @yield('content')

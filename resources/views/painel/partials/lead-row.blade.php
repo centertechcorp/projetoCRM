@@ -5,7 +5,7 @@
         'lost' => 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     ];
     $statusLabel = [
-        'open' => 'Aberto',
+        'open' => 'Em aberto',
         'won' => 'Vendido',
         'lost' => 'Perdido',
     ];
@@ -26,6 +26,8 @@
         'Baixa' => 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     ];
     $priorityIcon = ['Alta' => '🔥', 'Média' => '🟡', 'Baixa' => '⚪'];
+
+    $categoryLabel = ['celular' => '📱 Celular', 'peca' => '🔧 Peça'];
 @endphp
 <tr class="align-top" data-lead-row="{{ $lead->id }}">
     <td class="px-4 py-3">
@@ -42,6 +44,20 @@
         <div class="dark:text-slate-100">{{ $lead->product_interest ?: '—' }}</div>
         @if ($lead->quoted_amount)
             <div class="text-slate-500 dark:text-slate-400">R$ {{ number_format($lead->quoted_amount, 2, ',', '.') }}</div>
+        @endif
+        @if ($canDecide)
+            <form method="POST" action="{{ route('painel.leads.category', $lead) }}" class="js-row-action mt-1">
+                @csrf
+                <select name="category" onchange="this.form.requestSubmit()"
+                    data-tooltip="Corrige manualmente o filtro Celular/Peças, caso a classificação automática tenha errado."
+                    class="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <option value="" @selected(! $lead->product_category)>— sem categoria</option>
+                    <option value="celular" @selected($lead->product_category === 'celular')>📱 Celular</option>
+                    <option value="peca" @selected($lead->product_category === 'peca')>🔧 Peça</option>
+                </select>
+            </form>
+        @elseif ($lead->product_category)
+            <span class="mt-1 inline-block text-xs text-slate-500 dark:text-slate-400">{{ $categoryLabel[$lead->product_category] }}</span>
         @endif
     </td>
     <td class="px-4 py-3 text-slate-500 dark:text-slate-400">

@@ -67,12 +67,10 @@
                                     Sem telefone
                                 </span>
                             @endif
-                            @if ($ranked)
-                                <span class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {{ $priorityBadge[$conversation['priority_label']] }}"
-                                    @if ($conversation['priority_reason']) title="{{ $conversation['priority_reason'] }}" @endif>
-                                    #{{ $i + 1 }} {{ $priorityIcon[$conversation['priority_label']] }} {{ $conversation['priority_label'] }} · {{ $conversation['score'] }}
-                                </span>
-                            @endif
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {{ $priorityBadge[$conversation['priority_label']] }}"
+                                @if ($conversation['priority_reason']) title="{{ $conversation['priority_reason'] }}" @endif>
+                                #{{ $i + 1 }} {{ $priorityIcon[$conversation['priority_label']] }} {{ $conversation['priority_label'] }} · {{ $conversation['score'] }}
+                            </span>
                         </td>
                         <td class="whitespace-nowrap px-4 py-3">
                             <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ $conversation['recebidas'] }} recebidas</span>
@@ -106,7 +104,7 @@
                                 @else
                                     <form method="POST" action="{{ route('painel.chats.ignore', $chat) }}" class="js-confirm-delete">
                                         @csrf
-                                        <button data-tooltip="Ignora esse contato pra sempre (nunca mais vira lead) e some do relatório." class="w-full rounded-full border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-400 dark:bg-slate-950 dark:text-red-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(248,113,113,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(248,113,113,0.4)]">Ignorar</button>
+                                        <button data-tooltip="Marca esse contato pra nunca mais virar lead e some do relatório." class="w-full rounded-full border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-400 dark:bg-slate-950 dark:text-red-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(248,113,113,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(248,113,113,0.4)]">Deletar</button>
                                     </form>
                                 @endif
                             </td>

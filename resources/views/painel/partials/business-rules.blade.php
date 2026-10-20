@@ -24,9 +24,9 @@
                 <li><strong>Em andamento</strong> — lead aberto, sem sugestão esperando decisão agora.</li>
                 <li><strong>Reconectar</strong> — lead aberto com sugestão pendente: precisa decidir.</li>
                 <li><strong>Pós-venda</strong> — marcado como "Comprou".</li>
-                <li><strong>Desistiu</strong> — marcado como "Perdeu". Depois de <strong>{{ $f['lost_reconnect_after_days'] }} dias</strong>, o sistema sugere tentar reconectar de novo sozinho.</li>
-                <li><strong>Todos</strong> — soma de tudo, sem filtro.</li>
+                <li><strong>Desistiu</strong> — marcado como "Perdeu". Depois de <strong>{{ $f['lost_reconnect_after_days'] }} dias</strong>, o sistema sugere tentar reconectar — a sugestão aparece aqui dentro mesmo, e só quando for aprovada o lead reabre e pula pra aba "Reconectar".</li>
             </ul>
+            <p class="mt-1">Pra ver tudo junto, lead ou não, use o <a href="{{ route('painel.report') }}" class="underline hover:text-slate-900 dark:hover:text-slate-100">Relatório do dia</a>.</p>
         </div>
 
         <div>
@@ -44,13 +44,14 @@
 
         <div>
             <h3 class="mb-1 font-semibold text-slate-900 dark:text-slate-100">Selo de prioridade (🔥 🟡 ⚪)</h3>
-            <p class="mb-1">Na aba "Reconectar", os leads vêm ordenados por quem parece mais perto de comprar, não só por quem escreveu mais recente. O selo passa o mouse em cima (ou toca, no celular) pra ver o motivo:</p>
+            <p class="mb-1">Em qualquer lista de leads (Painel ou Relatório do dia), quem parece mais perto de comprar vem primeiro, não só quem escreveu mais recente. O selo passa o mouse em cima (ou toca, no celular) pra ver o motivo:</p>
             <ul class="list-inside list-disc space-y-1">
                 <li><span class="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-300">🔥 Alta</span> — já recebeu orçamento, ou perguntou algo de fechamento (preço, parcelamento, entrega, garantia...).</li>
                 <li><span class="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">🟡 Média</span> — citou um produto específico ou fez alguma pergunta direta, sem chegar a falar de fechamento.</li>
                 <li><span class="rounded-full bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">⚪ Baixa</span> — conversa parada sem sinal forte de interesse ainda (ex: só um "oi").</li>
             </ul>
             <p class="mt-1">É calculado por regras (sem IA), olhando as últimas mensagens do cliente — não muda o que vira lead, só a ordem de quem atender primeiro.</p>
+            <p class="mt-1">No Relatório do dia, o selo também mostra um número, tipo "#3 🔥 Alta · 67": o "#3" é só a posição no ranking daquele dia, e o "67" é a pontuação de 0 a 100 por trás do rótulo (≥50 vira Alta, ≥25 vira Média, abaixo disso é Baixa).</p>
         </div>
 
         <div>

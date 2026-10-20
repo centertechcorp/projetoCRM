@@ -21,14 +21,17 @@ class PainelController extends Controller
     /** Status ativos de uma sugestão de reabordagem (ainda não decidida). */
     private const OPEN_FOLLOWUP_STATUSES = ['candidate', 'draft_ready', 'approved'];
 
-    private const TABS = ['all', 'reconnect', 'won', 'lost', 'ongoing'];
+    private const TABS = ['reconnect', 'won', 'lost', 'ongoing'];
 
     /** Valor do filtro ?priority= => rótulo que LeadPriorityScorer::label() devolve. */
     private const PRIORITY_LABELS = ['alta' => 'Alta', 'media' => 'Média', 'baixa' => 'Baixa'];
 
-    public function index(Request $request, LeadPriorityScorer $scorer, SupplierPartsService $parts): View|JsonResponse
+    /** Valor do filtro ?category= => rótulo mostrado no select. */
+    private const CATEGORY_LABELS = ['celular' => 'Celular', 'peca' => 'Peças'];
+
+    public function index(Request $request, LeadPriorityScorer $scorer): View|JsonResponse
     {
-        $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all';
+        $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'reconnect';
         $user = $request->user();
 
         $storeId = $user->isSeller() ? $user->store_id : $request->query('store');
@@ -36,15 +39,21 @@ class PainelController extends Controller
         $storeId = is_numeric($storeId) ? (int) $storeId : null;
         $search = trim((string) $request->query('search'));
         $priority = (string) $request->query('priority', '');
+        $category = (string) $request->query('category', '');
 
         if (! isset(self::PRIORITY_LABELS[$priority])) {
             $priority = '';
+        }
+
+        if (! isset(self::CATEGORY_LABELS[$category])) {
+            $category = '';
         }
 
         $leads = $this->scopeTab(Lead::query(), $tab)
             ->with(['customer', 'store', 'chat', 'followups' => fn ($q) => $q->latest()])
             ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->when($search !== '', fn ($q) => $this->scopeSearch($q, $search))
+            ->when($category !== '', fn ($q) => $q->where('product_category', $category))
             ->orderByDesc('last_contact_at')
             ->get();
 
@@ -55,16 +64,16 @@ class PainelController extends Controller
                 && $scorer->label($scorer->score($lead)) === self::PRIORITY_LABELS[$priority])->values();
         }
 
-        // Na aba de reconectar, quem tem mais sinal de interesse real (pergunta de
-        // fechamento, orçamento já dado, engajamento) vem primeiro, não só o mais recente.
-        if ($tab === 'reconnect') {
-            $leads = $leads->sortByDesc(fn (Lead $lead) => $scorer->score($lead))->values();
-        }
+        // Em qualquer aba, quem tem mais sinal de interesse real (pergunta de fechamento,
+        // orçamento já dado, engajamento) vem primeiro, não só o contato mais recente —
+        // já carrega ordenado do maior pro menor, sem precisar de nenhuma ação extra.
+        $leads = $leads->sortByDesc(fn (Lead $lead) => $scorer->score($lead))->values();
 
         $counts = collect(self::TABS)->mapWithKeys(fn ($t) => [
             $t => $this->scopeTab(Lead::query(), $t)
                 ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
                 ->when($search !== '', fn ($q) => $this->scopeSearch($q, $search))
+                ->when($category !== '', fn ($q) => $q->where('product_category', $category))
                 ->count(),
         ]);
 
@@ -87,9 +96,14 @@ class PainelController extends Controller
             'selectedStore' => $storeId,
             'search' => $search,
             'priority' => $priority,
+            'category' => $category,
             'canDecide' => $canDecide,
-            'partsByCategory' => $parts->summaryByCategory(),
         ]);
+    }
+
+    public function parts(SupplierPartsService $parts): View
+    {
+        return view('painel.parts', ['partsByCategory' => $parts->summaryByCategory()]);
     }
 
     public function partsSearch(Request $request, SupplierPartsService $parts): JsonResponse
@@ -173,15 +187,48 @@ class PainelController extends Controller
     {
         $this->authorizeLead($request, $lead);
 
+        $leadId = $lead->id;
         $decisions->deletePermanently($lead);
 
         $message = 'Contato removido — marcado pra nunca mais virar lead.';
 
         if ($request->wantsJson()) {
-            return response()->json(['deleted' => true, 'message' => $message]);
+            return response()->json(['deleted' => true, 'message' => $message, 'leadId' => $leadId]);
         }
 
-        return back()->with('status', $message);
+        return back()->with('status', $message)->with('status_undo', [
+            'label' => 'Desfazer',
+            'url' => route('painel.leads.restore', $leadId),
+        ]);
+    }
+
+    /**
+     * Desfaz o botão "Deletar": o soft-delete do Lead e a flag "ignored" do chat não apagam
+     * nada de verdade, então restaurar é só reverter os dois (App\Services\Leads\LeadDecisionService).
+     */
+    public function restore(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse|JsonResponse
+    {
+        $this->authorizeLead($request, $lead);
+
+        $decisions->restore($lead);
+
+        return $this->respond($request, $lead, 'Contato restaurado.');
+    }
+
+    /**
+     * Correção manual do filtro "Celular x Peças" (select na linha do lead), pra quando a
+     * regra automática (LeadInfoExtractor::productCategory) classifica errado.
+     */
+    public function setCategory(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse|JsonResponse
+    {
+        $this->authorizeLead($request, $lead);
+
+        $category = (string) $request->string('category')->trim()->value();
+        $category = isset(self::CATEGORY_LABELS[$category]) ? $category : null;
+
+        $decisions->setProductCategory($lead, $category);
+
+        return $this->respond($request, $lead, 'Categoria do produto atualizada.');
     }
 
     private function respond(Request $request, Lead $lead, string $message): RedirectResponse|JsonResponse

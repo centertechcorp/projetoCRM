@@ -145,53 +145,55 @@ class PainelReportTest extends TestCase
         $response->assertDontSee('Mensagem do GENIUS');
     }
 
-    public function test_without_rank_the_button_says_gerar_leads_do_dia_and_order_is_chronological(): void
+    public function test_the_report_is_always_ranked_by_priority_with_no_toggle(): void
     {
         $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $account = $this->makeAccount($center, 'CENTER');
 
+        // O fraco é mais recente que o forte — por hora ficaria primeiro; por prioridade, não.
         $weak = $this->makeChat($account, 'Cliente Fraco', '5534999990010');
-        $this->makeMessage($account, $weak, 'in', 'oi', now()->subHours(3));
+        $this->makeMessage($account, $weak, 'in', 'oi', now()->subMinutes(10));
 
         $strong = $this->makeChat($account, 'Cliente Forte', '5534999990011');
-        $this->makeMessage($account, $strong, 'in', 'Quanto fica no boleto, tem desconto?', now()->subHour());
+        $this->makeMessage($account, $strong, 'in', 'Quanto fica parcelado no cartão pra esse iphone? Tem desconto à vista?', now()->subHours(5));
 
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
         $response = $this->actingAs($user)->get('/painel/relatorio');
 
         $response->assertOk();
-        $response->assertSee('Gerar leads do dia');
+        // Rótulos de prioridade (Alta/Média/Baixa) já aparecem sem precisar clicar em nada,
+        // e não existe mais nenhum botão de alternância.
+        $response->assertDontSee('Gerar leads do dia');
         $response->assertDontSee('Voltar pra ordem cronológica');
-        // Sem rank, é por hora — "oi" (3h atrás) vem antes de "Quanto fica..." (1h atrás)? Não:
-        // ordena por last_sent_at DESC, então o mais recente (Forte) aparece primeiro mesmo sem rank.
-        $response->assertSeeInOrder(['Cliente Forte', 'Cliente Fraco']);
-    }
-
-    public function test_rank_orders_strongest_lead_first_regardless_of_time(): void
-    {
-        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
-        $account = $this->makeAccount($center, 'CENTER');
-
-        // O fraco é mais recente que o forte — sem rank ficaria primeiro; com rank, não.
-        $weak = $this->makeChat($account, 'Cliente Fraco', '5534999990012');
-        $this->makeMessage($account, $weak, 'in', 'oi', now()->subMinutes(10));
-
-        $strong = $this->makeChat($account, 'Cliente Forte', '5534999990013');
-        $this->makeMessage($account, $strong, 'in', 'Quanto fica parcelado no cartão pra esse iphone? Tem desconto à vista?', now()->subHours(5));
-
-        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
-
-        $response = $this->actingAs($user)->get('/painel/relatorio?rank=1');
-
-        $response->assertOk();
-        $response->assertSee('Voltar pra ordem cronológica');
         $response->assertSeeInOrder(['Cliente Forte', 'Cliente Fraco']);
         $response->assertSee('🔥 Alta');
         $response->assertSee('⚪ Baixa');
     }
 
-    public function test_shows_an_ignorar_button_for_a_conversation_that_never_became_a_lead(): void
+    public function test_an_old_rank_query_param_no_longer_changes_anything(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+
+        $weak = $this->makeChat($account, 'Cliente Fraco', '5534999990010');
+        $this->makeMessage($account, $weak, 'in', 'oi', now()->subMinutes(10));
+
+        $strong = $this->makeChat($account, 'Cliente Forte', '5534999990011');
+        $this->makeMessage($account, $strong, 'in', 'Quanto fica parcelado no cartão pra esse iphone? Tem desconto à vista?', now()->subHours(5));
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        // rank=0 é um link antigo (favorito salvo, histórico do navegador) — o parâmetro
+        // simplesmente não existe mais no controller, então o resultado é sempre ranqueado.
+        $response = $this->actingAs($user)->get('/painel/relatorio?rank=0');
+
+        $response->assertOk();
+        $response->assertSeeInOrder(['Cliente Forte', 'Cliente Fraco']);
+        $response->assertSee('🔥 Alta');
+    }
+
+    public function test_shows_a_deletar_button_for_a_conversation_that_never_became_a_lead(): void
     {
         $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $account = $this->makeAccount($center, 'CENTER');
@@ -203,8 +205,25 @@ class PainelReportTest extends TestCase
         $response = $this->actingAs($user)->get('/painel/relatorio');
 
         $response->assertOk();
-        $response->assertSee('Ignorar');
-        $response->assertDontSee('Deletar');
+        $response->assertSee('Deletar');
+    }
+
+    public function test_restoring_an_ignored_chat_that_never_became_a_lead_undoes_it(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $chat = $this->makeChat($account, 'Fornecedor', '5534999990098');
+        $this->makeMessage($account, $chat, 'in', 'oi', now());
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $this->actingAs($user)->post(route('painel.chats.ignore', $chat))->assertRedirect();
+        $this->assertTrue($chat->fresh()->ignored);
+
+        $response = $this->actingAs($user)->postJson(route('painel.chats.restore', $chat));
+
+        $response->assertOk();
+        $this->assertFalse($chat->fresh()->ignored);
     }
 
     public function test_shows_the_same_lead_action_buttons_when_the_conversation_already_has_a_lead(): void
@@ -262,6 +281,20 @@ class PainelReportTest extends TestCase
 
         $this->actingAs($seller)->post("/painel/chats/{$chat->id}/ignore")->assertForbidden();
         $this->assertFalse($chat->fresh()->ignored);
+    }
+
+    public function test_a_seller_cannot_restore_a_chat_from_another_store(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $genius = Store::create(['code' => 'GENIUS', 'name' => 'GENIUS']);
+        $geniusAccount = $this->makeAccount($genius, 'GENIUS');
+        $chat = $this->makeChat($geniusAccount, 'Cliente Genius', '5534999990097');
+        $chat->update(['ignored' => true]);
+
+        $seller = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'seller', $center->id);
+
+        $this->actingAs($seller)->post("/painel/chats/{$chat->id}/restore")->assertForbidden();
+        $this->assertTrue($chat->fresh()->ignored);
     }
 
     public function test_guest_is_redirected_to_login_for_actions_summary(): void

@@ -33,8 +33,8 @@ class PainelReportController extends Controller
         $search = trim((string) $request->query('search'));
 
         $messages = WhatsappMessage::query()
-            // Chat ignorado (botão "Ignorar"/"Deletar") some do relatório pra sempre, mesmo
-            // nos dias em que já tinha mensagem gravada antes de ser ignorado.
+            // Chat ignorado (botão "Deletar") some do relatório pra sempre, mesmo nos dias em
+            // que já tinha mensagem gravada antes de ser ignorado.
             ->whereHas('chat', fn ($q) => $q->where('kind', 'individual')->where('ignored', false))
             // Buscando, o contato tem que aparecer independente do dia — "se tá no banco, tem
             // que aparecer" — então só restringe pelo dia selecionado quando não há busca.
@@ -54,7 +54,6 @@ class PainelReportController extends Controller
             'enviadas' => $group->where('direction', 'out')->count(),
         ])->sortKeys();
 
-        $ranked = $request->boolean('rank');
         $canDecide = (bool) $user->can_decide;
 
         // Conversa pode já ter virado lead (StalledConversationDetector) mesmo sem o
@@ -66,9 +65,12 @@ class PainelReportController extends Controller
             ->get()
             ->keyBy('whatsapp_chat_id');
 
-        $conversations = $messages->groupBy('whatsapp_chat_id')->map(function ($group) use ($scorer, $ranked, $leadsByChat) {
+        $conversations = $messages->groupBy('whatsapp_chat_id')->map(function ($group) use ($scorer, $leadsByChat) {
             $first = $group->first();
-            $entry = [
+            $customerMessages = $group->where('direction', 'in')->values();
+            $score = $scorer->scoreMessages($customerMessages);
+
+            return [
                 'chat' => $first->chat,
                 'store' => $first->account->store,
                 'messages' => $group->values(),
@@ -76,21 +78,13 @@ class PainelReportController extends Controller
                 'recebidas' => $group->where('direction', 'in')->count(),
                 'enviadas' => $group->where('direction', 'out')->count(),
                 'lead' => $leadsByChat->get($first->whatsapp_chat_id),
+                'score' => $score,
+                'priority_label' => $scorer->label($score),
+                'priority_reason' => $scorer->reasonForMessages($customerMessages),
             ];
-
-            if ($ranked) {
-                $customerMessages = $group->where('direction', 'in')->values();
-                $entry['score'] = $scorer->scoreMessages($customerMessages);
-                $entry['priority_label'] = $scorer->label($entry['score']);
-                $entry['priority_reason'] = $scorer->reasonForMessages($customerMessages);
-            }
-
-            return $entry;
         });
 
-        $conversations = $ranked
-            ? $conversations->sortByDesc('score')->values()
-            : $conversations->sortByDesc('last_sent_at')->values();
+        $conversations = $conversations->sortByDesc('score')->values();
 
         // Busca ao vivo (JS em report.blade.php): só troca a área de resultados, sem navegar
         // a página — mesmo padrão já usado no painel principal.
@@ -98,7 +92,7 @@ class PainelReportController extends Controller
             return response()->json([
                 'html' => view('painel.partials.report-results', [
                     'search' => $search, 'date' => $date, 'summary' => $summary,
-                    'messages' => $messages, 'conversations' => $conversations, 'ranked' => $ranked,
+                    'messages' => $messages, 'conversations' => $conversations,
                     'canDecide' => $canDecide,
                 ])->render(),
             ]);
@@ -112,7 +106,6 @@ class PainelReportController extends Controller
             'stores' => $user->isSeller() ? collect() : Store::where('code', '!=', 'MIXCELL')->orderBy('name')->get(),
             'selectedStore' => $storeId,
             'search' => $search,
-            'ranked' => $ranked,
             'canDecide' => $canDecide,
             'chartDefaultFrom' => $date->subDays(6)->toDateString(),
             'chartDefaultTo' => $date->toDateString(),
@@ -170,12 +163,46 @@ class PainelReportController extends Controller
     }
 
     /**
-     * Ignora uma conversa direto do Relatório do dia, mesmo quando ela ainda não virou lead
-     * (ex.: fornecedor com atendimento automático) — mesmo efeito do botão "Deletar" do
-     * painel (App\Services\Leads\LeadDecisionService::deletePermanently), só que sem precisar
-     * de um Lead já existir.
+     * Botão "Deletar" do Relatório do dia pra conversa que ainda não virou lead (ex.:
+     * fornecedor com atendimento automático) — mesmo efeito do "Deletar" do painel
+     * (App\Services\Leads\LeadDecisionService::deletePermanently), só que sem precisar de um
+     * Lead já existir, por isso é uma rota própria em vez de PainelController::destroy().
      */
     public function ignoreChat(Request $request, WhatsappChat $chat): RedirectResponse|JsonResponse
+    {
+        $this->authorizeChat($request, $chat);
+
+        $chat->update(['ignored' => true]);
+
+        $message = 'Contato removido — marcado pra nunca mais virar lead.';
+
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true, 'message' => $message, 'chatId' => $chat->id]);
+        }
+
+        return back()->with('status', $message)->with('status_undo', [
+            'label' => 'Desfazer',
+            'url' => route('painel.chats.restore', $chat),
+        ]);
+    }
+
+    /** Desfaz o "Deletar" de uma conversa sem lead: a flag "ignored" não apaga nada de verdade. */
+    public function restoreChat(Request $request, WhatsappChat $chat): RedirectResponse|JsonResponse
+    {
+        $this->authorizeChat($request, $chat);
+
+        $chat->update(['ignored' => false]);
+
+        $message = 'Contato restaurado.';
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return back()->with('status', $message);
+    }
+
+    private function authorizeChat(Request $request, WhatsappChat $chat): void
     {
         $user = $request->user();
 
@@ -186,15 +213,5 @@ class PainelReportController extends Controller
         if ($user->isSeller() && $chat->account->store_id !== $user->store_id) {
             abort(Response::HTTP_FORBIDDEN, 'Essa conversa não é da sua loja.');
         }
-
-        $chat->update(['ignored' => true]);
-
-        $message = 'Contato ignorado — nunca mais vira lead e some do relatório.';
-
-        if ($request->wantsJson()) {
-            return response()->json(['deleted' => true, 'message' => $message]);
-        }
-
-        return back()->with('status', $message);
     }
 }

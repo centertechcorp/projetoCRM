@@ -112,6 +112,15 @@ class StalledConversationDetector
         if ($quotedAmount !== null) {
             $lead->quoted_amount = $quotedAmount;
         }
+
+        // Travado = alguém corrigiu na mão (painel.leads.category) — não deixa o próximo
+        // ciclo do whatsapp:leads:detect reclassificar por cima da correção.
+        if (! $lead->product_category_locked) {
+            $productCategory = $this->extractor->productCategory($customerMessages);
+            if ($productCategory !== null) {
+                $lead->product_category = $productCategory;
+            }
+        }
     }
 
     private function findOrCreateCustomer(WhatsappChat $chat): ?Customer

@@ -68,4 +68,22 @@ class LeadDecisionService
         $lead->chat?->update(['ignored' => true]);
         $lead->delete();
     }
+
+    /** Desfaz o "Deletar": nem o soft-delete nem a flag "ignored" apagam nada de verdade. */
+    public function restore(Lead $lead): void
+    {
+        $lead->chat?->update(['ignored' => false]);
+        $lead->restore();
+    }
+
+    /**
+     * Correção manual do filtro "Celular x Peças" (App\Services\Leads\LeadInfoExtractor
+     * classifica por regra, mas pode errar — ex.: "capinha de iphone" citando a marca só como
+     * complemento). Travar impede o próximo ciclo do whatsapp:leads:detect de reclassificar
+     * por cima da correção.
+     */
+    public function setProductCategory(Lead $lead, ?string $category): void
+    {
+        $lead->update(['product_category' => $category, 'product_category_locked' => true]);
+    }
 }

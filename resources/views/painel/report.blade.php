@@ -23,26 +23,13 @@
                 @endforeach
             </select>
         @endif
-        @if ($ranked)
-            <input type="hidden" name="rank" value="0">
-            <button type="submit" title="Volta pra ordem cronológica (mais recente primeiro)."
-                class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                Voltar pra ordem cronológica
-            </button>
-        @else
-            <input type="hidden" name="rank" value="1">
-            <button type="submit" title="Calcula, pra esse dia, quais conversas parecem mais perto de fechar — do mais forte pro mais fraco."
-                class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                Gerar leads do dia
-            </button>
-        @endif
     </form>
 </div>
 
 <div id="reportResults">
     @include('painel.partials.report-results', [
         'search' => $search, 'date' => $date, 'summary' => $summary,
-        'messages' => $messages, 'conversations' => $conversations, 'ranked' => $ranked,
+        'messages' => $messages, 'conversations' => $conversations,
         'canDecide' => $canDecide,
     ])
 </div>
@@ -68,6 +55,10 @@
         </div>
         <ul id="actionsLegend" class="flex-1 space-y-2 text-sm"></ul>
     </div>
+</div>
+
+<div class="mt-6">
+    @include('painel.partials.business-rules')
 </div>
 
 <script>
