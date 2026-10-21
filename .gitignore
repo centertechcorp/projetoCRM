@@ -29,3 +29,6 @@ Thumbs.db
 # Chaves/senhas reais do WAHA em texto puro, não é pra versionar.
 /waha/docker-compose.yml
 /waha/backups/
+
+# Dump do banco (dados reais de cliente, não é pra versionar).
+/backups/
