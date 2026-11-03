@@ -42,8 +42,8 @@ class PainelReportController extends Controller
             ->with(['chat', 'account.store'])
             ->when($storeId, fn ($q) => $q->whereHas('account', fn ($a) => $a->where('store_id', $storeId)))
             ->when($search !== '', fn ($q) => $q->whereHas('chat', fn (Builder $c) => $c
-                ->where('display_name', 'ilike', "%{$search}%")
-                ->orWhere('phone', 'ilike', "%{$search}%")))
+                ->whereLike('display_name', "%{$search}%")
+                ->orWhereLike('phone', "%{$search}%")))
             ->orderBy('sent_at')
             ->get();
 

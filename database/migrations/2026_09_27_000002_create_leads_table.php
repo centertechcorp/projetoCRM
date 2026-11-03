@@ -37,10 +37,24 @@ return new class extends Migration
         });
 
         // Só 1 lead em aberto por cliente e loja; permite histórico de leads fechados/perdidos.
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement(<<<'SQL'
+                CREATE UNIQUE INDEX leads_open_customer_store_unique
+                    ON leads (customer_id, store_id)
+                    WHERE status = 'open' AND deleted_at IS NULL
+            SQL);
+
+            return;
+        }
+
+        // MariaDB não tem índice parcial: coluna gerada que só tem valor enquanto o lead está
+        // aberto e não apagado (NULL não colide no UNIQUE, então o histórico segue permitido).
         DB::statement(<<<'SQL'
-            CREATE UNIQUE INDEX leads_open_customer_store_unique
-                ON leads (customer_id, store_id)
-                WHERE status = 'open' AND deleted_at IS NULL
+            ALTER TABLE leads
+                ADD COLUMN open_key VARCHAR(40)
+                    AS (CASE WHEN status = 'open' AND deleted_at IS NULL
+                             THEN CONCAT(customer_id, '-', store_id) END) STORED,
+                ADD UNIQUE INDEX leads_open_customer_store_unique (open_key)
         SQL);
     }
 

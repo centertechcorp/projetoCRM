@@ -137,11 +137,11 @@ class PainelController extends Controller
     /** @param  Builder<Lead>  $query */
     private function scopeSearch($query, string $term)
     {
-        // ilike (não like): Postgres é case-sensitive por padrão em LIKE.
+        // whereLike (case-insensitive): vira ILIKE no Postgres e LIKE (collation _ci) no MariaDB.
         return $query->where(fn (Builder $q) => $q
-            ->whereHas('customer', fn ($c) => $c->where('name', 'ilike', "%{$term}%")
-                ->orWhere('phone', 'ilike', "%{$term}%"))
-            ->orWhere('product_interest', 'ilike', "%{$term}%"));
+            ->whereHas('customer', fn ($c) => $c->whereLike('name', "%{$term}%")
+                ->orWhereLike('phone', "%{$term}%"))
+            ->orWhereLike('product_interest', "%{$term}%"));
     }
 
     public function approveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse

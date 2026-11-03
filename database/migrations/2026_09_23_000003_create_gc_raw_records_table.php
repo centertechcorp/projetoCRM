@@ -22,7 +22,10 @@ return new class extends Migration {
             $table->unique(['store_id', 'entity', 'gc_id']);
         });
 
-        DB::statement('CREATE INDEX gc_raw_records_payload_gin ON gc_raw_records USING GIN (payload)');
+        // GIN só existe no Postgres; nenhuma query do app filtra dentro do JSON, então no MariaDB fica sem.
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('CREATE INDEX gc_raw_records_payload_gin ON gc_raw_records USING GIN (payload)');
+        }
     }
 
     public function down(): void

@@ -9,7 +9,7 @@ return new class extends Migration
     {
         // Só leitura, pra conferir no DBeaver quem é quem (loja/conta) sem juntar tabela na mão.
         DB::statement('
-            CREATE VIEW whatsapp_messages_view AS
+            CREATE OR REPLACE VIEW whatsapp_messages_view AS
             SELECT wm.*, s.code AS loja, wa.label AS conta
             FROM whatsapp_messages wm
             JOIN whatsapp_accounts wa ON wa.id = wm.whatsapp_account_id

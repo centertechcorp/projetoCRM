@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('whatsapp_chats', function (Blueprint $table) {
             $table->id();
             $table->foreignId('whatsapp_account_id')->constrained()->restrictOnDelete();
-            $table->string('chat_key', 64);
+            $table->string('chat_key', 64)
+                ->collation(\Illuminate\Support\Facades\DB::getDriverName() === 'pgsql' ? null : 'utf8mb4_bin');
             $table->string('jid', 200);
             $table->enum('kind', ['individual', 'group']);
             $table->string('phone', 32)->nullable();

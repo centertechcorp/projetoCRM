@@ -17,6 +17,7 @@ class Lead extends Model
     {
         return [
             'products' => 'array',
+            'product_category_locked' => 'boolean',
             'quoted_amount' => 'decimal:2',
             'won_at' => 'datetime',
             'lost_at' => 'datetime',

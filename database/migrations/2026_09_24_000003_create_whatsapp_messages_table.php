@@ -12,7 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('whatsapp_account_id')->constrained()->restrictOnDelete();
             $table->foreignId('whatsapp_chat_id')->constrained()->restrictOnDelete();
-            $table->string('external_id', 200);
+            $table->string('external_id', 200)
+                ->collation(\Illuminate\Support\Facades\DB::getDriverName() === 'pgsql' ? null : 'utf8mb4_bin');
             $table->enum('direction', ['in', 'out']);
             $table->string('sender_name')->nullable();
             $table->string('sender_jid', 200)->nullable();

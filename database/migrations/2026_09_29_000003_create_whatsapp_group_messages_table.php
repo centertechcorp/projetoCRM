@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('whatsapp_group_messages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('whatsapp_account_id')->constrained()->restrictOnDelete();
-            $table->string('external_id', 200);
+            $table->string('external_id', 200)
+                ->collation(\Illuminate\Support\Facades\DB::getDriverName() === 'pgsql' ? null : 'utf8mb4_bin');
             $table->string('group_jid', 200);
             $table->string('group_name')->nullable();
             $table->string('sender_jid', 200)->nullable();

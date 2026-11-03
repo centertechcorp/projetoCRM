@@ -81,9 +81,26 @@ services:
             test: ['CMD', 'pg_isready', '-q', '-d', '${DB_DATABASE}', '-U', '${DB_USERNAME}']
             retries: 3
             timeout: 5s
+    # MariaDB só para testar a compatibilidade (php artisan test --configuration=phpunit.mariadb.xml).
+    # Convive com o pgsql; o app continua usando Postgres por padrão. Sem porta publicada no host.
+    mariadb:
+        image: 'mariadb:10.11'
+        environment:
+            MARIADB_ROOT_PASSWORD: 'secret'
+            MARIADB_DATABASE: 'testing'
+        volumes:
+            - 'sail-mariadb:/var/lib/mysql'
+        networks:
+            - sail
+        healthcheck:
+            test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+            retries: 5
+            timeout: 5s
 networks:
     sail:
         driver: bridge
 volumes:
     sail-pgsql:
+        driver: local
+    sail-mariadb:
         driver: local
