@@ -57,11 +57,13 @@ Tudo precisa dar "ok". Depois abrir o CRM no navegador e entrar.
 
 ## 4. Levar os dados do ambiente atual (Postgres → MariaDB)
 
-Feito uma única vez, de um computador que enxerga o Postgres atual e o MariaDB de destino.
+Feito uma única vez, de um computador que enxerga o Postgres antigo (`docker compose --profile pgsql up -d pgsql`)
+e o MariaDB de destino. Hoje o ambiente local já roda em MariaDB; o servidor precisa receber os dados
+ou pela cópia abaixo ou restaurando um dump do MariaDB local (`./scripts/dump-db.sh`).
 O MariaDB de destino precisa estar **vazio e já migrado**.
 
 ```bash
-./scripts/dump-db.sh                                    # backup do Postgres (guardar)
+DUMP_DRIVER=pgsql ./scripts/dump-db.sh                 # backup do Postgres antigo (guardar)
 # no .env: MARIADB_TARGET_HOST / _PORT / _DATABASE / _USERNAME / _PASSWORD
 php artisan migrate --database=mariadb_target --force
 php artisan db:copy-pg-to-mariadb --dry-run             # só conta, não escreve

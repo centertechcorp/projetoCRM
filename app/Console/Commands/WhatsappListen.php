@@ -35,7 +35,7 @@ class WhatsappListen extends Command
                 $accounts = WhatsappAccount::query()->where('active', true)->count();
             } catch (Throwable $e) {
                 $this->components->error('Não consegui ler o banco: '.$e->getMessage());
-                $this->components->warn('Rodando no host, use DB_HOST=127.0.0.1 (o nome "pgsql" só existe dentro do Sail).');
+                $this->components->warn('Rodando no host, use DB_HOST=127.0.0.1 (o nome "mariadb" só existe dentro do Sail).');
 
                 return self::FAILURE;
             }

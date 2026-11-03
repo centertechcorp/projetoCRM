@@ -23,7 +23,8 @@ services:
         networks:
             - sail
         depends_on:
-            - pgsql
+            mariadb:
+                condition: service_healthy
     # Roda `php artisan schedule:run` a cada minuto, para o whatsapp:leads:detect (agendado
     # em routes/console.php) executar sozinho enquanto o Docker estiver de pé — sem depender
     # de cron no WSL, que não persiste entre reinícios.
@@ -43,7 +44,8 @@ services:
         networks:
             - sail
         depends_on:
-            - pgsql
+            mariadb:
+                condition: service_healthy
     # Processa a fila (hoje só os jobs do webhook do WAHA — ver app/Jobs/Whatsapp). Sem isso
     # rodando, os jobs só ficam parados na tabela `jobs`, nada é gravado no banco.
     queue:
@@ -62,8 +64,12 @@ services:
         networks:
             - sail
         depends_on:
-            - pgsql
+            mariadb:
+                condition: service_healthy
+    # Aposentado: o banco agora é o MariaDB (igual ao servidor). Só sobe se pedir o perfil:
+    #   docker compose --profile pgsql up -d pgsql      (o volume sail-pgsql continua guardado)
     pgsql:
+        profiles: ['pgsql']
         image: 'postgres:18-alpine'
         ports:
             - '${FORWARD_DB_PORT:-5432}:5432'
@@ -81,15 +87,21 @@ services:
             test: ['CMD', 'pg_isready', '-q', '-d', '${DB_DATABASE}', '-U', '${DB_USERNAME}']
             retries: 3
             timeout: 5s
-    # MariaDB só para testar a compatibilidade (php artisan test --configuration=phpunit.mariadb.xml).
-    # Convive com o pgsql; o app continua usando Postgres por padrão. Sem porta publicada no host.
+    # Banco do CRM (MariaDB, o mesmo do servidor). O banco e o usuário nascem do .env na primeira
+    # criação do volume; o banco "testing" (testes) vem do script de init.
     mariadb:
         image: 'mariadb:10.11'
+        ports:
+            - '127.0.0.1:${FORWARD_DB_PORT:-3306}:3306'
+        command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
         environment:
-            MARIADB_ROOT_PASSWORD: 'secret'
-            MARIADB_DATABASE: 'testing'
+            MARIADB_ROOT_PASSWORD: '${DB_ROOT_PASSWORD:-secret}'
+            MARIADB_DATABASE: '${DB_DATABASE}'
+            MARIADB_USER: '${DB_USERNAME}'
+            MARIADB_PASSWORD: '${DB_PASSWORD}'
         volumes:
             - 'sail-mariadb:/var/lib/mysql'
+            - './docker/mariadb/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
         networks:
             - sail
         healthcheck:

@@ -1,6 +1,6 @@
 # Projeto CRM
 
-Base Laravel + PostgreSQL para sincronizar dados do GestãoClick das lojas CENTER,
+Base Laravel + MariaDB para sincronizar dados do GestãoClick das lojas CENTER,
 GENIUS e MIXCELL. O fuso da aplicação é `America/Sao_Paulo`.
 
 ## Rodar localmente com Docker Desktop
@@ -10,8 +10,8 @@ GENIUS e MIXCELL. O fuso da aplicação é `America/Sao_Paulo`.
 ./vendor/bin/sail artisan migrate --seed
 ```
 
-A aplicação fica em `http://localhost:8000` e o PostgreSQL em `localhost:5432`
-(`crm` / `postgres` / `password`). Para acompanhar o servidor: `./vendor/bin/sail logs -f`.
+A aplicação fica em `http://localhost:8000` e o MariaDB em `localhost:3306`
+(banco `crm`, usuário `crm`, senha do `.env`; só aceita conexão do próprio computador, ex.: DBeaver). Para acompanhar o servidor: `./vendor/bin/sail logs -f`.
 
 ## Tabelas
 
@@ -53,15 +53,15 @@ extensão está em `whatsapp-extension/README.md`.
 
 ### Depois de uma queda (restart / recovery)
 
-1. `./vendor/bin/sail up -d` — sobe Postgres, app, scheduler **e a fila** (processa os jobs do
+1. `./vendor/bin/sail up -d` — sobe MariaDB, app, scheduler **e a fila** (processa os jobs do
    webhook do WAHA; sem isso, mensagem do WAHA fica parada na tabela `jobs` sem gravar).
    Se o WAHA também estiver em uso: `docker compose -f waha/docker-compose.yml up -d` e confira
    com `php artisan whatsapp:waha:health-check` se as duas sessões (CENTER/GENIUS) voltaram
    `WORKING` — se não, precisa reconectar/escanear QR de novo em `http://localhost:3001/dashboard`
    (ou `:3002` pra GENIUS).
 2. No host (não no Sail), em modo `--database`: `DB_HOST=127.0.0.1 php artisan whatsapp:listen
-   --database`. O `DB_HOST=pgsql` do `.env` é só pro app/scheduler de dentro do Sail; de fora
-   (no host) o nome `pgsql` não resolve, por isso o override na hora de rodar. Sem `--database`
+   --database`. O `DB_HOST=mariadb` do `.env` é só pro app/scheduler de dentro do Sail; de fora
+   (no host) o nome `mariadb` não resolve, por isso o override na hora de rodar. Sem `--database`
    (grava só em `.txt`), não precisa do `DB_HOST` nem de banco: `php artisan whatsapp:listen`.
 3. Se o Chrome tiver sido fechado, reabra os perfis (CENTER/GENIUS): o WhatsApp Web reconecta
    sozinho, sem pedir QR code de novo e sem precisar reconfigurar token.
@@ -74,7 +74,7 @@ extensão está em `whatsapp-extension/README.md`.
 
 Com `WHATSAPP_DATABASE=true` (ou `php artisan whatsapp:listen --database`) o daemon grava também no
 banco, e os `.txt` viram cópia de segurança (uma subpasta por conta). Rodando no host, use
-`DB_HOST=127.0.0.1`: o nome `pgsql` só existe dentro do Sail.
+`DB_HOST=127.0.0.1`: o nome `mariadb` só existe dentro do Sail.
 
 Cada número de WhatsApp é uma **conta** (`whatsapp_accounts`), ligada a uma loja, com o próprio token:
 
@@ -231,3 +231,12 @@ O painel usa Tailwind 4 via Vite. Compile antes de abrir no navegador: `npm inst
 `sessions`, `cache`/`cache_locks` e `jobs` (migrations `2026_09_27_182447` a `182449`) fazem parte do
 `php artisan migrate`. Sem elas, login e qualquer coisa que use `RateLimiter`/cache derruba com
 `relation "sessions" does not exist`.
+
+## Banco de dados (MariaDB; Postgres aposentado)
+
+O CRM roda em MariaDB, igual ao servidor. O Postgres antigo está parado (não apagado): o volume
+`centercorp_sail-pgsql` guarda os dados de antes da troca e os dumps ficam em `backups/`.
+
+- Testes: `php artisan test` (MariaDB, banco `testing`). Para o Postgres: `docker compose --profile pgsql up -d pgsql`
+  e `vendor/bin/phpunit --configuration phpunit.pgsql.xml`.
+- Backup: `./scripts/dump-db.sh` (MariaDB). Deploy no servidor: `docs/DEPLOY.md`.

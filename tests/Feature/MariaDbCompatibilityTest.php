@@ -16,9 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * Pontos do esquema que só funcionam por caminhos diferentes no MariaDB (o Postgres é o padrão).
- * Rodam só em MariaDB/MySQL: php artisan test --configuration não serve, use
- * vendor/bin/phpunit --configuration phpunit.mariadb.xml
+ * Pontos do esquema que só funcionam por caminhos diferentes no MariaDB (agora o banco padrão).
+ * Rodam só em MariaDB/MySQL; na suíte do Postgres (phpunit.pgsql.xml) são pulados.
  */
 class MariaDbCompatibilityTest extends TestCase
 {

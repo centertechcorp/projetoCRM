@@ -59,3 +59,10 @@ Sempre passar `config('app.timezone')` (ou equivalente) como segundo argumento.
 Rodar a suíte completa (`php artisan test`) — o teste
 `Tests\Feature\WhatsappMetaWebhookTest > string timestamp is converted` já pegou essa
 regressão uma vez; se voltar a falhar com uma diferença de exatas 3h, é o mesmo bug.
+
+## MariaDB (banco atual)
+
+O ambiente agora roda em MariaDB. Lá a coluna `timestamp` guarda o horário que o Laravel envia
+(já em `America/Sao_Paulo`), sem conversão: no DBeaver o horário aparece em Brasília. Não existe
+o bloco `timezone` da conexão `pgsql` para o MariaDB. Teste de ida e volta em
+`tests/Feature/MariaDbCompatibilityTest.php` (`test_timestamps_are_stored_and_read_back_without_a_three_hour_shift`).
