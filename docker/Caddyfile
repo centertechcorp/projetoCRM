@@ -1,0 +1,21 @@
+{
+	frankenphp
+}
+
+(laravel) {
+	root * /app/public
+	encode zstd gzip
+	php_server
+}
+
+# Endereço público (SERVER_NAME=crm.seudominio.com.br → HTTPS automático com Let's Encrypt).
+# Sem SERVER_NAME (ensaio local), atende http na porta 80.
+{$SERVER_NAME::80} {
+	import laravel
+}
+
+# Endereço interno da rede do Docker: é por aqui que o WAHA entrega o webhook
+# (http://app/api/whatsapp/waha/...). http:// explícito evita o redirecionamento pra HTTPS.
+http://app {
+	import laravel
+}

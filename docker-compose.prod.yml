@@ -1,0 +1,121 @@
+# Stack de PRODUÇÃO num único servidor: CRM (app + queue + scheduler), PostgreSQL e os dois WAHA
+# (CENTER e GENIUS) na mesma rede Docker — por isso o CRM fala com o WAHA pelo nome do container
+# e o WAHA entrega o webhook em http://app/..., sem host.docker.internal.
+#
+# Uso (sempre com o arquivo de segredos, que NÃO vai pro Git):
+#   cp .env.production.example .env.production   # e preencher
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+# Ou use scripts/deploy.sh.
+name: ${COMPOSE_PROJECT_NAME:-centercorp-prod}
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: centercorp-crm-prod:latest
+  env_file: .env.production
+  restart: unless-stopped
+  networks: [crm]
+  depends_on:
+    pgsql:
+      condition: service_healthy
+
+services:
+  app:
+    <<: *app
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+      - '${HTTPS_PORT:-443}:443/udp'
+    volumes:
+      - app-storage:/app/storage
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ['CMD', 'php', '-r', 'exit(@file_get_contents("http://127.0.0.1/up", false, stream_context_create(["http" => ["header" => "Host: app"]])) === false ? 1 : 0);']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Processa a fila (jobs do webhook do WAHA, download de mídia, resolução de telefone).
+  # Sem isso as mensagens ficam paradas na tabela `jobs` e nada é gravado.
+  queue:
+    <<: *app
+    entrypoint: ['app-entrypoint']
+    command: ['php', 'artisan', 'queue:work', '--sleep=1', '--tries=3', '--max-time=3600']
+    volumes:
+      - app-storage:/app/storage
+
+  # Roda whatsapp:leads:detect (18h seg-sex, 12h sáb) e o health-check do WAHA (a cada 5 min).
+  scheduler:
+    <<: *app
+    entrypoint: ['app-entrypoint']
+    command: ['php', 'artisan', 'schedule:work']
+    volumes:
+      - app-storage:/app/storage
+
+  pgsql:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    networks: [crm]
+    # Sem "ports": o banco NÃO fica exposto na internet, só a rede interna enxerga.
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -q -d ${DB_DATABASE} -U ${DB_USERNAME}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  waha-center:
+    image: devlikeapro/waha
+    restart: unless-stopped
+    networks: [crm]
+    # Dashboard (QR code) só pelo próprio servidor: acesse via túnel SSH
+    #   ssh -L 3001:127.0.0.1:3001 usuario@servidor  →  http://localhost:3001
+    ports:
+      - '127.0.0.1:${WAHA_CENTER_LOCAL_PORT:-3001}:3000'
+    environment:
+      WAHA_API_KEY: ${WAHA_CENTER_API_KEY}
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_CENTER_DASHBOARD_PASSWORD}
+      # "message.any" além de "message": sem ele, o que a loja manda não fica registrado.
+      WHATSAPP_HOOK_URL: http://app/api/whatsapp/waha/center
+      WHATSAPP_HOOK_EVENTS: message,message.any,session.status
+      # Mesma chave de WAHA_WEBHOOK_HMAC_KEY do CRM — assina cada POST do webhook.
+      WHATSAPP_HOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY}
+    volumes:
+      - waha-center-sessions:/app/.sessions
+
+  waha-genius:
+    image: devlikeapro/waha
+    restart: unless-stopped
+    networks: [crm]
+    ports:
+      - '127.0.0.1:${WAHA_GENIUS_LOCAL_PORT:-3002}:3000'
+    environment:
+      WAHA_API_KEY: ${WAHA_GENIUS_API_KEY}
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_GENIUS_DASHBOARD_PASSWORD}
+      WHATSAPP_HOOK_URL: http://app/api/whatsapp/waha/genius
+      WHATSAPP_HOOK_EVENTS: message,message.any,session.status
+      WHATSAPP_HOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY}
+    volumes:
+      - waha-genius-sessions:/app/.sessions
+
+networks:
+  crm:
+    driver: bridge
+
+volumes:
+  pgdata:
+  app-storage:
+  caddy-data:
+  caddy-config:
+  waha-center-sessions:
+  waha-genius-sessions:
