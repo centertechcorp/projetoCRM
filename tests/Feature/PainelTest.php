@@ -59,7 +59,7 @@ class PainelTest extends TestCase
         $this->makeLead($center, 'Cliente Center', '5534999990001');
         $this->makeLead($genius, 'Cliente Genius', '5534999990002');
 
-        $response = $this->actingAs($seller)->get('/painel?tab=ongoing');
+        $response = $this->actingAs($seller)->get('/painel?tab=reconnect');
 
         $response->assertSee('Cliente Center');
         $response->assertDontSee('Cliente Genius');
@@ -74,7 +74,7 @@ class PainelTest extends TestCase
         $this->makeLead($center, 'Cliente Center', '5534999990003');
         $this->makeLead($genius, 'Cliente Genius', '5534999990004');
 
-        $response = $this->actingAs($manager)->get('/painel?tab=ongoing');
+        $response = $this->actingAs($manager)->get('/painel?tab=reconnect');
 
         $response->assertSee('Cliente Center');
         $response->assertSee('Cliente Genius');
@@ -97,7 +97,7 @@ class PainelTest extends TestCase
         $user = $this->makeUser('vendedor@center.com', 'senha-boa-123', 'manager', null, canDecide: false);
         $lead = $this->makeLead($store, 'Cliente', '5534999990030');
 
-        $response = $this->actingAs($user)->get('/painel?tab=ongoing');
+        $response = $this->actingAs($user)->get('/painel?tab=reconnect');
 
         // Checa a URL do form, não a palavra solta — "Aprovar"/"Comprou" também aparecem
         // no texto explicativo "Como funciona", que é visível pra todo mundo.
@@ -220,13 +220,13 @@ class PainelTest extends TestCase
         $this->assertSame('dismissed', $followup->fresh()->status);
     }
 
-    public function test_marking_a_lead_as_won_moves_it_out_of_the_ongoing_tab(): void
+    public function test_marking_a_lead_as_won_moves_it_out_of_the_reconnect_tab(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
         $lead = $this->makeLead($store, 'Cliente', '5534999990008');
 
-        $ongoingBefore = $this->actingAs($user)->get('/painel?tab=ongoing');
+        $ongoingBefore = $this->actingAs($user)->get('/painel?tab=reconnect');
         $ongoingBefore->assertSee('5534999990008');
 
         $this->actingAs($user)->post(route('painel.leads.won', $lead));
@@ -235,7 +235,7 @@ class PainelTest extends TestCase
         $this->assertSame('won', $lead->status);
         $this->assertNotNull($lead->archive_after);
 
-        $ongoingAfter = $this->actingAs($user)->get('/painel?tab=ongoing');
+        $ongoingAfter = $this->actingAs($user)->get('/painel?tab=reconnect');
         $ongoingAfter->assertDontSee('5534999990008');
 
         $wonResponse = $this->actingAs($user)->get('/painel?tab=won');
@@ -254,33 +254,67 @@ class PainelTest extends TestCase
         $this->assertSame('lost', $lead->status);
         $this->assertSame('sem retorno', $lead->lost_reason);
 
-        $this->actingAs($user)->get('/painel?tab=ongoing')->assertDontSee('5534999990009');
+        $this->actingAs($user)->get('/painel?tab=reconnect')->assertDontSee('5534999990009');
         $this->actingAs($user)->get('/painel?tab=lost')->assertSee('5534999990009');
     }
 
-    public function test_ongoing_and_reconnect_tabs_split_open_leads_by_pending_followup(): void
+    public function test_open_leads_are_split_across_reconnect_ongoing_and_separated_by_followup(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
 
-        $freshLead = $this->makeLead($store, 'Cliente Fresco', '5534999990010');
+        $this->makeLead($store, 'Sem Sugestao', '5534999990010');
+        $this->leadWithFollowup($store, 'Pendente', '5534999990011', 'candidate');
+        $this->leadWithFollowup($store, 'Aprovado', '5534999990016', 'approved');
+        $this->leadWithFollowup($store, 'Separado', '5534999990017', 'dismissed');
 
-        $staleLead = $this->makeLead($store, 'Cliente Parado', '5534999990011');
+        $reconnect = $this->actingAs($user)->get('/painel?tab=reconnect');
+        $reconnect->assertSee('5534999990010')->assertSee('5534999990011');
+        $reconnect->assertDontSee('5534999990016')->assertDontSee('5534999990017');
+
+        // Só o Aprovar leva pra "Em andamento".
+        $ongoing = $this->actingAs($user)->get('/painel?tab=ongoing');
+        $ongoing->assertSee('5534999990016');
+        $ongoing->assertDontSee('5534999990010')->assertDontSee('5534999990011')->assertDontSee('5534999990017');
+
+        // Só o Separar leva pra "Separado".
+        $separated = $this->actingAs($user)->get('/painel?tab=separated');
+        $separated->assertSee('5534999990017');
+        $separated->assertDontSee('5534999990010')->assertDontSee('5534999990011')->assertDontSee('5534999990016');
+    }
+
+    public function test_a_new_pending_followup_brings_a_separated_lead_back_to_reconnect(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $lead = $this->leadWithFollowup($store, 'Voltou', '5534999990018', 'dismissed');
         LeadFollowup::create([
-            'lead_id' => $staleLead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
+            'lead_id' => $lead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
             'status' => 'candidate', 'suggested_by' => 'rules',
         ]);
 
-        $ongoing = $this->actingAs($user)->get('/painel?tab=ongoing');
-        $ongoing->assertSee('5534999990010');
-        $ongoing->assertDontSee('5534999990011');
-
-        $reconnect = $this->actingAs($user)->get('/painel?tab=reconnect');
-        $reconnect->assertSee('5534999990011');
-        $reconnect->assertDontSee('5534999990010');
+        $this->actingAs($user)->get('/painel?tab=separated')->assertDontSee('5534999990018');
+        $this->actingAs($user)->get('/painel?tab=reconnect')->assertSee('5534999990018');
     }
 
-    public function test_a_dismissed_followup_moves_the_lead_back_to_ongoing(): void
+    public function test_dismissing_via_ajax_reports_the_separated_tab_and_the_tab_count_shows_up(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $lead = $this->makeLead($store, 'Cliente', '5534999990019');
+        $followup = LeadFollowup::create([
+            'lead_id' => $lead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
+            'status' => 'candidate', 'suggested_by' => 'rules',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('painel.followups.dismiss', $followup));
+
+        $response->assertOk()->assertJsonPath('tab', 'separated');
+        $this->assertStringContainsString('Separado', $response->json('message'));
+        $this->actingAs($user)->get('/painel?tab=separated')->assertSee('Separado')->assertSee('(1)');
+    }
+
+    public function test_a_dismissed_followup_moves_the_lead_to_the_separated_tab(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
@@ -293,7 +327,7 @@ class PainelTest extends TestCase
         $this->actingAs($user)->post(route('painel.followups.dismiss', $followup));
 
         $this->actingAs($user)->get('/painel?tab=reconnect')->assertDontSee('5534999990012');
-        $this->actingAs($user)->get('/painel?tab=ongoing')->assertSee('5534999990012');
+        $this->actingAs($user)->get('/painel?tab=separated')->assertSee('5534999990012');
     }
 
     public function test_deleting_a_lead_ignores_its_chat_and_removes_it_from_every_tab(): void
@@ -317,7 +351,7 @@ class PainelTest extends TestCase
         $this->assertTrue($chat->fresh()->ignored);
         $this->assertNotNull($lead->fresh()->deleted_at);
         $this->assertSame(0, Lead::count());
-        $this->actingAs($user)->get('/painel?tab=ongoing')->assertDontSee('5534999990013');
+        $this->actingAs($user)->get('/painel?tab=reconnect')->assertDontSee('5534999990013');
     }
 
     public function test_deleting_a_lead_without_a_linked_chat_does_not_error(): void
@@ -356,7 +390,7 @@ class PainelTest extends TestCase
         $response->assertOk()->assertJsonStructure(['message', 'row']);
         $this->assertNull($lead->fresh()->deleted_at);
         $this->assertFalse($chat->fresh()->ignored);
-        $this->actingAs($user)->get('/painel?tab=ongoing')->assertSee('Gisele');
+        $this->actingAs($user)->get('/painel?tab=reconnect')->assertSee('Gisele');
     }
 
     public function test_a_seller_cannot_restore_a_lead_from_another_store(): void
@@ -423,7 +457,7 @@ class PainelTest extends TestCase
         Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
-        $this->actingAs($user)->get('/painel?tab=ongoing&store=abc')->assertOk();
+        $this->actingAs($user)->get('/painel?tab=reconnect&store=abc')->assertOk();
     }
 
     public function test_category_filter_shows_only_leads_of_the_selected_category(): void
@@ -437,10 +471,10 @@ class PainelTest extends TestCase
         $peca = $this->makeLead($store, 'Cliente Peça', '5534999990041');
         $peca->update(['product_category' => 'peca']);
 
-        $this->actingAs($user)->get('/painel?tab=ongoing&category=celular')
+        $this->actingAs($user)->get('/painel?tab=reconnect&category=celular')
             ->assertSee('Cliente Celular')->assertDontSee('Cliente Peça');
 
-        $this->actingAs($user)->get('/painel?tab=ongoing&category=peca')
+        $this->actingAs($user)->get('/painel?tab=reconnect&category=peca')
             ->assertSee('Cliente Peça')->assertDontSee('Cliente Celular');
     }
 
@@ -466,7 +500,7 @@ class PainelTest extends TestCase
         $lead = $this->makeLead($store, 'Cliente', '5534999990044');
         $lead->update(['product_category' => 'celular']);
 
-        $html = $this->actingAs($user)->get('/painel?tab=ongoing')->getContent();
+        $html = $this->actingAs($user)->get('/painel?tab=reconnect')->getContent();
 
         $this->assertStringContainsString('<option value="celular" selected', $html);
     }
@@ -505,7 +539,7 @@ class PainelTest extends TestCase
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
         $response = $this->actingAs($user)
-            ->getJson('/painel?tab=ongoing&search=Gisele');
+            ->getJson('/painel?tab=reconnect&search=Gisele');
 
         $response->assertOk();
         $response->assertJsonStructure(['html']);
@@ -523,7 +557,7 @@ class PainelTest extends TestCase
         $lead->update(['last_contact_at' => '2026-10-10 14:30:00']);
         $user = $this->makeUser('owner@center.com', 'senha-boa-123');
 
-        $response = $this->actingAs($user)->get('/painel?tab=ongoing');
+        $response = $this->actingAs($user)->get('/painel?tab=reconnect');
 
         $response->assertSee('Data');
         $response->assertDontSee('Origem');
@@ -618,6 +652,17 @@ class PainelTest extends TestCase
         // nativo do navegador tem atraso fixo e fora do nosso controle.
         $response->assertSee('data-tooltip="Aprova essa sugestão', false);
         $response->assertDontSee(' title="', false);
+    }
+
+    private function leadWithFollowup(Store $store, string $name, string $phone, string $status): Lead
+    {
+        $lead = $this->makeLead($store, $name, $phone);
+        LeadFollowup::create([
+            'lead_id' => $lead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
+            'status' => $status, 'suggested_by' => 'rules',
+        ]);
+
+        return $lead;
     }
 
     private function makeLead(Store $store, string $name, string $phone): Lead

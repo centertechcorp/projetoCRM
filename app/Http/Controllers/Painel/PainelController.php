@@ -18,10 +18,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PainelController extends Controller
 {
-    /** Sugestão ainda esperando decisão: o lead fica em "Reconectar". Aprovada já vai pra "Em andamento". */
+    /** Sugestão ainda esperando decisão: o lead fica em "Reconectar". Aprovada vai pra "Em andamento"; separada, pra "Separado". */
     private const PENDING_FOLLOWUP_STATUSES = ['candidate', 'draft_ready'];
 
-    private const TABS = ['reconnect', 'won', 'lost', 'ongoing'];
+    private const TABS = ['reconnect', 'won', 'lost', 'ongoing', 'separated'];
 
     /** Valor do filtro ?priority= => rótulo que LeadPriorityScorer::label() devolve. */
     private const PRIORITY_LABELS = ['alta' => 'Alta', 'media' => 'Média', 'baixa' => 'Baixa'];
@@ -117,10 +117,18 @@ class PainelController extends Controller
     private function scopeTab($query, string $tab)
     {
         return match ($tab) {
+            // Só o botão Aprovar leva pra "Em andamento"; só o Separar leva pra "Separado".
             'ongoing' => $query->where('status', 'open')
-                ->whereDoesntHave('followups', fn ($q) => $q->whereIn('status', self::PENDING_FOLLOWUP_STATUSES)),
+                ->whereHas('followups', fn ($q) => $q->where('status', 'approved')),
+            'separated' => $query->where('status', 'open')
+                ->whereDoesntHave('followups', fn ($q) => $q->whereIn('status', [...self::PENDING_FOLLOWUP_STATUSES, 'approved']))
+                ->whereHas('followups', fn ($q) => $q->where('status', 'dismissed')),
+            // O resto dos abertos: sugestão pendente ou ainda sem nenhuma decisão sua.
             'reconnect' => $query->where('status', 'open')
-                ->whereHas('followups', fn ($q) => $q->whereIn('status', self::PENDING_FOLLOWUP_STATUSES)),
+                ->whereDoesntHave('followups', fn ($q) => $q->where('status', 'approved'))
+                ->where(fn ($q) => $q
+                    ->whereHas('followups', fn ($f) => $f->whereIn('status', self::PENDING_FOLLOWUP_STATUSES))
+                    ->orWhereDoesntHave('followups', fn ($f) => $f->where('status', 'dismissed'))),
             'won', 'lost' => $query->where('status', $tab),
             default => $query,
         };
@@ -153,7 +161,7 @@ class PainelController extends Controller
 
         $decisions->dismissFollowup($followup);
 
-        return $this->respond($request, $followup->lead, 'Lead separado — volta pra "Em andamento".');
+        return $this->respond($request, $followup->lead, 'Lead separado — foi pra aba "Separado".');
     }
 
     public function unapproveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse
@@ -256,9 +264,15 @@ class PainelController extends Controller
             return $lead->status;
         }
 
-        $pending = $lead->followups->contains(fn ($f) => in_array($f->status, self::PENDING_FOLLOWUP_STATUSES, true));
+        $statuses = $lead->followups->pluck('status');
 
-        return $pending ? 'reconnect' : 'ongoing';
+        if ($statuses->contains('approved')) {
+            return 'ongoing';
+        }
+
+        $pending = $statuses->intersect(self::PENDING_FOLLOWUP_STATUSES)->isNotEmpty();
+
+        return ! $pending && $statuses->contains('dismissed') ? 'separated' : 'reconnect';
     }
 
     private function authorizeLead(Request $request, Lead $lead): void

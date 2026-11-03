@@ -11,7 +11,7 @@
             </form>
             <form method="POST" action="{{ route('painel.followups.dismiss', $followup) }}" class="{{ $rowClass() }}">
                 @csrf
-                <button data-tooltip="Cancela só essa sugestão. O lead continua aberto e volta pra &quot;Em andamento&quot;." class="w-full rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-400 dark:bg-slate-950 dark:text-slate-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(148,163,184,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(148,163,184,0.4)]">Separar</button>
+                <button data-tooltip="Cancela só essa sugestão: o contato vai pra aba &quot;Separado&quot;. O lead continua aberto." class="w-full rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-400 dark:bg-slate-950 dark:text-slate-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(148,163,184,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(148,163,184,0.4)]">Separar</button>
             </form>
         @endif
 

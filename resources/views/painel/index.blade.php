@@ -8,6 +8,7 @@
         'won' => 'Pós-venda',
         'lost' => 'Desistiu',
         'ongoing' => 'Em andamento',
+        'separated' => 'Separado',
     ];
 @endphp
 
