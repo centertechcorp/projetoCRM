@@ -9,10 +9,10 @@
                 <tr>
                     <th class="px-4 py-1.5">Cliente</th>
                     <th class="px-4 py-1.5">Loja</th>
-                    <th class="px-4 py-1.5">Produto / Orçamento</th>
+                    <th class="whitespace-nowrap px-4 py-1.5">Produto / Orçamento</th>
                     <th class="px-4 py-1.5">Data</th>
                     <th class="px-4 py-1.5">Sugestão de reabordagem</th>
-                    <th class="px-4 py-1.5">Ações</th>
+                    <th class="px-4 py-1.5"><div class="ml-auto text-center" style="width: 5.1rem">Ações</div></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">

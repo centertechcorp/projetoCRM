@@ -67,7 +67,7 @@
         <div class="mb-1 flex items-center gap-1.5">
             @if ($priorityLabel)
                 <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {{ $priorityBadge[$priorityLabel] }}"
-                    @if ($priorityReason) title="{{ $priorityReason }}" @endif>
+                    @if ($priorityReason) data-tooltip="{{ $priorityReason }}" @endif>
                     {{ $priorityIcon[$priorityLabel] }} {{ $priorityLabel }}
                 </span>
             @endif

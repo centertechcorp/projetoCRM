@@ -561,6 +561,65 @@ class PainelTest extends TestCase
         ]);
     }
 
+    public function test_approving_moves_the_lead_to_ongoing_with_copy_and_undo_buttons_and_undoing_sends_it_back(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $lead = $this->makeLead($store, 'Cliente Parado', '5534999990060');
+        $followup = LeadFollowup::create([
+            'lead_id' => $lead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
+            'status' => 'candidate', 'suggested_by' => 'rules',
+        ]);
+
+        $approve = $this->actingAs($user)->postJson(route('painel.followups.approve', $followup));
+
+        $approve->assertOk()->assertJsonPath('tab', 'ongoing');
+        $this->assertStringContainsString('Em andamento', $approve->json('message'));
+        $this->assertStringContainsString(route('painel.followups.unapprove', $followup), $approve->json('row'));
+        $this->assertStringContainsString('data-copy-link', $approve->json('row'));
+
+        $this->actingAs($user)->get('/painel?tab=reconnect')->assertDontSee('5534999990060');
+        $ongoing = $this->actingAs($user)->get('/painel?tab=ongoing');
+        $ongoing->assertSee('5534999990060');
+        $ongoing->assertSee(route('painel.followups.unapprove', $followup), false);
+
+        $undo = $this->actingAs($user)->postJson(route('painel.followups.unapprove', $followup));
+
+        $undo->assertOk()->assertJsonPath('tab', 'reconnect');
+        $this->assertStringContainsString('Reconectar', $undo->json('message'));
+        $this->actingAs($user)->get('/painel?tab=ongoing')->assertDontSee('5534999990060');
+        $this->actingAs($user)->get('/painel?tab=reconnect')->assertSee('5534999990060');
+    }
+
+    public function test_ajax_actions_report_the_tab_the_lead_landed_in(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $won = $this->makeLead($store, 'Comprou', '5534999990061');
+        $lost = $this->makeLead($store, 'Perdeu', '5534999990062');
+
+        $this->actingAs($user)->postJson(route('painel.leads.won', $won))->assertJsonPath('tab', 'won');
+        $this->actingAs($user)->postJson(route('painel.leads.lost', $lost))->assertJsonPath('tab', 'lost');
+    }
+
+    public function test_action_buttons_use_the_custom_tooltip_instead_of_the_native_title(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123', 'owner');
+        $lead = $this->makeLead($store, 'Cliente Parado', '5534999990050');
+        LeadFollowup::create([
+            'lead_id' => $lead->id, 'type' => 'recover', 'reason' => 'customer_unanswered',
+            'status' => 'candidate', 'suggested_by' => 'rules',
+        ]);
+
+        $response = $this->actingAs($user)->get('/painel?tab=reconnect');
+
+        // O atraso do tooltip (JS em painel/index) só vale pro data-tooltip; o title
+        // nativo do navegador tem atraso fixo e fora do nosso controle.
+        $response->assertSee('data-tooltip="Aprova essa sugestão', false);
+        $response->assertDontSee(' title="', false);
+    }
+
     private function makeLead(Store $store, string $name, string $phone): Lead
     {
         $customer = Customer::create(['phone' => $phone, 'name' => $name]);

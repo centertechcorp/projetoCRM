@@ -18,8 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PainelController extends Controller
 {
-    /** Status ativos de uma sugestão de reabordagem (ainda não decidida). */
-    private const OPEN_FOLLOWUP_STATUSES = ['candidate', 'draft_ready', 'approved'];
+    /** Sugestão ainda esperando decisão: o lead fica em "Reconectar". Aprovada já vai pra "Em andamento". */
+    private const PENDING_FOLLOWUP_STATUSES = ['candidate', 'draft_ready'];
 
     private const TABS = ['reconnect', 'won', 'lost', 'ongoing'];
 
@@ -118,9 +118,9 @@ class PainelController extends Controller
     {
         return match ($tab) {
             'ongoing' => $query->where('status', 'open')
-                ->whereDoesntHave('followups', fn ($q) => $q->whereIn('status', self::OPEN_FOLLOWUP_STATUSES)),
+                ->whereDoesntHave('followups', fn ($q) => $q->whereIn('status', self::PENDING_FOLLOWUP_STATUSES)),
             'reconnect' => $query->where('status', 'open')
-                ->whereHas('followups', fn ($q) => $q->whereIn('status', self::OPEN_FOLLOWUP_STATUSES)),
+                ->whereHas('followups', fn ($q) => $q->whereIn('status', self::PENDING_FOLLOWUP_STATUSES)),
             'won', 'lost' => $query->where('status', $tab),
             default => $query,
         };
@@ -144,7 +144,7 @@ class PainelController extends Controller
 
         $storeCode = $followup->lead->store->code;
 
-        return $this->respond($request, $followup->lead, "Sugestão aprovada. Copie o link do WhatsApp e cole na janela do Chrome da loja {$storeCode}.");
+        return $this->respond($request, $followup->lead, "Sugestão aprovada. O contato foi para a aba \"Em andamento\": lá ele aparece com os botões de sempre, mais \"Copiar link\" (cole na janela do Chrome da loja {$storeCode}) e \"Desfazer aprovação\" (se desfazer, ele volta para \"Reconectar\").");
     }
 
     public function dismissFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse
@@ -162,7 +162,7 @@ class PainelController extends Controller
 
         $decisions->unapproveFollowup($followup);
 
-        return $this->respond($request, $followup->lead, 'Aprovação desfeita.');
+        return $this->respond($request, $followup->lead, 'Aprovação desfeita. O contato voltou para a aba "Reconectar".');
     }
 
     public function markWon(Request $request, Lead $lead, LeadDecisionService $decisions): RedirectResponse|JsonResponse
@@ -234,16 +234,31 @@ class PainelController extends Controller
     private function respond(Request $request, Lead $lead, string $message): RedirectResponse|JsonResponse
     {
         if ($request->wantsJson()) {
+            $fresh = $lead->fresh(['customer', 'store', 'chat', 'followups' => fn ($q) => $q->latest()]);
+
             return response()->json([
                 'message' => $message,
+                'tab' => $this->tabFor($fresh),
                 'row' => view('painel.partials.lead-row', [
-                    'lead' => $lead->fresh(['customer', 'store', 'chat', 'followups' => fn ($q) => $q->latest()]),
+                    'lead' => $fresh,
                     'canDecide' => (bool) $request->user()->can_decide,
                 ])->render(),
             ]);
         }
 
         return back()->with('status', $message);
+    }
+
+    /** Aba em que o lead aparece agora (mesmo critério de scopeTab). */
+    private function tabFor(Lead $lead): string
+    {
+        if ($lead->status !== 'open') {
+            return $lead->status;
+        }
+
+        $pending = $lead->followups->contains(fn ($f) => in_array($f->status, self::PENDING_FOLLOWUP_STATUSES, true));
+
+        return $pending ? 'reconnect' : 'ongoing';
     }
 
     private function authorizeLead(Request $request, Lead $lead): void

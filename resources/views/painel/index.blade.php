@@ -100,6 +100,8 @@
 </div>
 
 <script>
+    const currentTab = @json($tab);
+
     let flashHideTimer = null;
 
     (function () {
@@ -191,7 +193,7 @@
                     tooltipEl.style.top = top + 'px';
                     tooltipEl.style.left = left + 'px';
                     tooltipEl.style.visibility = 'visible';
-                }, 3000);
+                }, 1200);
             });
 
             el.addEventListener('mouseleave', function () {
@@ -306,7 +308,9 @@
                         bindTooltips(newRow);
                         newRow.querySelectorAll('form.js-row-action').forEach(bindRowAction);
 
-                        if (data.message) {
+                        // Só tira a linha da lista (com o aviso) se o lead mudou de aba; se continua
+                        // nesta aba, os botões novos já estão na linha e ela fica onde está.
+                        if (data.message && (!data.tab || data.tab !== currentTab)) {
                             showRowToast(newRow, data.message);
                         }
                     }

@@ -40,7 +40,7 @@
                     <th class="px-4 py-3">Direção</th>
                     <th class="px-4 py-3">Mensagem</th>
                     @if ($canDecide)
-                        <th class="px-4 py-3">Ações</th>
+                        <th class="px-4 py-3"><div class="ml-auto text-center" style="width: 5.1rem">Ações</div></th>
                     @endif
                 </tr>
             </thead>
@@ -58,17 +58,17 @@
                             <div class="text-slate-500 dark:text-slate-400">{{ $chat->phone ?? $chat->chat_key }}</div>
                             @if ($chat->phone)
                                 <button type="button" data-copy-link="https://web.whatsapp.com/send?phone={{ $chat->phone }}" data-store="{{ $conversation['store']->code }}"
-                                    title="Copia o link do WhatsApp — cole na janela do Chrome da loja {{ $conversation['store']->code }}."
+                                    data-tooltip="Copia o link do WhatsApp — cole na janela do Chrome da loja {{ $conversation['store']->code }}."
                                     class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-300 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-400 dark:bg-slate-950 dark:text-emerald-300 dark:hover:bg-[rgba(52,211,153,0.1)]">
                                     💬 Copiar link ({{ $conversation['store']->code }})
                                 </button>
                             @else
-                                <span title="O WhatsApp não mandou o telefone real desse contato (ID de privacidade)." class="mt-1 inline-block text-xs text-slate-400 dark:text-slate-500">
+                                <span data-tooltip="O WhatsApp não mandou o telefone real desse contato (ID de privacidade)." class="mt-1 inline-block text-xs text-slate-400 dark:text-slate-500">
                                     Sem telefone
                                 </span>
                             @endif
                             <span class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {{ $priorityBadge[$conversation['priority_label']] }}"
-                                @if ($conversation['priority_reason']) title="{{ $conversation['priority_reason'] }}" @endif>
+                                @if ($conversation['priority_reason']) data-tooltip="{{ $conversation['priority_reason'] }}" @endif>
                                 #{{ $i + 1 }} {{ $priorityIcon[$conversation['priority_label']] }} {{ $conversation['priority_label'] }} · {{ $conversation['score'] }}
                             </span>
                         </td>

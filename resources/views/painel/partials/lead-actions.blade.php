@@ -3,11 +3,11 @@
     $rowClass = fn (string $base = '') => trim(($ajax ? 'js-row-action ' : '').$base);
 @endphp
 @if ($canDecide)
-    <div class="flex flex-col gap-1.5">
+    <div class="ml-auto flex w-fit flex-col gap-1.5" style="min-width: 5.1rem">
         @if ($followup && in_array($followup->status, ['candidate', 'draft_ready']))
             <form method="POST" action="{{ route('painel.followups.approve', $followup) }}" class="{{ $rowClass() }}">
                 @csrf
-                <button data-tooltip="Aprova essa sugestão e libera o botão &quot;Copiar link&quot; com a mensagem pronta." class="w-full rounded-full border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:border-cyan-400 dark:bg-slate-950 dark:text-cyan-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(34,211,238,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(34,211,238,0.4)]">Aprovar</button>
+                <button data-tooltip="Aprova essa sugestão: o contato vai pra aba &quot;Em andamento&quot;, onde aparece o botão &quot;Copiar link&quot; com a mensagem pronta." class="w-full rounded-full border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:border-cyan-400 dark:bg-slate-950 dark:text-cyan-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(34,211,238,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(34,211,238,0.4)]">Aprovar</button>
             </form>
             <form method="POST" action="{{ route('painel.followups.dismiss', $followup) }}" class="{{ $rowClass() }}">
                 @csrf
@@ -23,7 +23,7 @@
             </button>
             <form method="POST" action="{{ route('painel.followups.unapprove', $followup) }}" class="{{ $rowClass() }}">
                 @csrf
-                <button data-tooltip="Desfaz a aprovação, volta a sugestão pro estado de antes." class="w-full rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-400 dark:bg-slate-950 dark:text-slate-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(148,163,184,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(148,163,184,0.4)]">Desfazer aprovação</button>
+                <button data-tooltip="Desfaz a aprovação: o contato volta pra aba &quot;Reconectar&quot;, com a sugestão de antes." class="w-full rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-400 dark:bg-slate-950 dark:text-slate-300 dark:transition-all dark:duration-200 dark:hover:bg-[rgba(148,163,184,0.1)] dark:hover:-translate-y-[3px] dark:hover:shadow-[0_6px_20px_rgba(148,163,184,0.4)]">Desfazer aprovação</button>
             </form>
         @endif
 
