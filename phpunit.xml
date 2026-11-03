@@ -25,6 +25,10 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_DATABASE" value="testing"/>
         <env name="DB_URL" value=""/>
+        <env name="MARIADB_TARGET_HOST" value="mariadb"/>
+        <env name="MARIADB_TARGET_DATABASE" value="testing"/>
+        <env name="MARIADB_TARGET_USERNAME" value="root"/>
+        <env name="MARIADB_TARGET_PASSWORD" value="secret"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

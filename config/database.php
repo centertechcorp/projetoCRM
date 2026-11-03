@@ -84,6 +84,23 @@ return [
             ]) : [],
         ],
 
+        // Destino da migração Postgres → MariaDB (php artisan db:copy-pg-to-mariadb). Só é usada
+        // nessa migração única; o app em si usa a conexão padrão (DB_CONNECTION).
+        'mariadb_target' => [
+            'driver' => 'mariadb',
+            'host' => env('MARIADB_TARGET_HOST'),
+            'port' => env('MARIADB_TARGET_PORT', '3306'),
+            'database' => env('MARIADB_TARGET_DATABASE'),
+            'username' => env('MARIADB_TARGET_USERNAME'),
+            'password' => env('MARIADB_TARGET_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
         // Banco do fornecedor (Mix Atacado) — só leitura, pra consultar preço/estoque de
         // peças. Nunca escreve nada aqui, é a base deles, não a nossa.
         'mix_atacado' => [
