@@ -64,20 +64,28 @@ class MariaDbCompatibilityTest extends TestCase
 
     public function test_owner_role_requires_a_valid_owner_slot(): void
     {
-        $base = ['password' => 'x', 'active' => true];
+        try {
+            DB::table('users')->insert(['name' => 'A', 'email' => 'a@x.com', 'password' => 'x', 'role' => 'owner', 'owner_slot' => 9,
+                'created_at' => now(), 'updated_at' => now()]);
+            $this->fail('owner com owner_slot inválido deveria ser rejeitado.');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('users_role_owner_slot_check', $e->getMessage());
+        }
 
-        $this->expectException(QueryException::class);
-
-        DB::table('users')->insert($base + ['name' => 'A', 'email' => 'a@x.com', 'role' => 'owner', 'owner_slot' => 9,
+        DB::table('users')->insert(['name' => 'A', 'email' => 'a@x.com', 'password' => 'x', 'role' => 'owner', 'owner_slot' => 1,
             'created_at' => now(), 'updated_at' => now()]);
+        $this->assertSame(1, DB::table('users')->count());
     }
 
     public function test_non_owner_cannot_have_an_owner_slot(): void
     {
-        $this->expectException(QueryException::class);
-
-        DB::table('users')->insert(['name' => 'B', 'email' => 'b@x.com', 'password' => 'x', 'role' => 'seller', 'owner_slot' => 1,
-            'created_at' => now(), 'updated_at' => now()]);
+        try {
+            DB::table('users')->insert(['name' => 'B', 'email' => 'b@x.com', 'password' => 'x', 'role' => 'seller', 'owner_slot' => 1,
+                'created_at' => now(), 'updated_at' => now()]);
+            $this->fail('seller com owner_slot deveria ser rejeitado.');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('users_role_owner_slot_check', $e->getMessage());
+        }
     }
 
     public function test_search_is_case_and_accent_insensitive_and_treats_wildcards_literally_enough(): void
