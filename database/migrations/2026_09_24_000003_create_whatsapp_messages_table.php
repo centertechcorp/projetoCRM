@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('sent_via', 16)->nullable();
             $table->string('quoted_external_id', 200)->nullable();
             $table->string('type', 40);
-            $table->text('body')->default('');
+            $table->longText('body')->default('');
             $table->timestampTz('sent_at');
             $table->string('source', 32);
             $table->jsonb('payload')->nullable();

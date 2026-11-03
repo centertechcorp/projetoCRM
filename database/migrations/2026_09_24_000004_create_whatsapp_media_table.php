@@ -22,7 +22,7 @@ return new class extends Migration
             $table->enum('download_status', ['pending', 'done', 'failed'])->default('done');
             $table->unsignedInteger('duration_seconds')->nullable();
             $table->enum('transcript_status', ['pending', 'done', 'failed', 'skipped'])->nullable();
-            $table->text('transcript')->nullable();
+            $table->longText('transcript')->nullable();
             $table->string('transcript_language', 16)->nullable();
             $table->string('transcript_provider', 64)->nullable();
             $table->timestampTz('transcribed_at')->nullable();

@@ -55,6 +55,7 @@ class PainelController extends Controller
             ->when($search !== '', fn ($q) => $this->scopeSearch($q, $search))
             ->when($category !== '', fn ($q) => $q->where('product_category', $category))
             ->orderByDesc('last_contact_at')
+            ->orderByDesc('id')
             ->get();
 
         // Filtro de prioridade (Alta/Média/Baixa) é calculado por regra, não dá pra fazer

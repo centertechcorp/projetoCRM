@@ -156,6 +156,20 @@ class MariaDbCompatibilityTest extends TestCase
         $this->assertSame(2, WhatsappMessage::count());
     }
 
+    public function test_a_message_body_bigger_than_64kb_is_stored_whole(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = WhatsappAccount::create(['store_id' => $store->id, 'label' => 'A', 'provider' => 'waha', 'provider_account_ref' => 's']);
+        $chat = WhatsappChat::create(['whatsapp_account_id' => $account->id, 'chat_key' => 'k', 'jid' => 'k@s.whatsapp.net', 'kind' => 'individual']);
+        // Já aconteceu de verdade: uma foto em base64 (70 KB) caiu no body e estourou o TEXT do MariaDB.
+        $big = str_repeat('/9j/4AAQSkZJRg', 8000);
+
+        $message = WhatsappMessage::create(['whatsapp_account_id' => $account->id, 'whatsapp_chat_id' => $chat->id,
+            'external_id' => 'big', 'direction' => 'in', 'type' => 'image', 'body' => $big, 'sent_at' => now(), 'source' => 'waha']);
+
+        $this->assertSame(strlen($big), strlen($message->fresh()->body));
+    }
+
     public function test_the_messages_view_exposes_store_and_account(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);

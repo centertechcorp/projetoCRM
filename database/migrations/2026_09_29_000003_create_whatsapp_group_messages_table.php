@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('group_name')->nullable();
             $table->string('sender_jid', 200)->nullable();
             $table->string('sender_name')->nullable();
-            $table->text('body');
+            $table->longText('body');
             $table->timestampTz('sent_at');
             $table->timestampsTz();
             $table->unique(['whatsapp_account_id', 'external_id']);
