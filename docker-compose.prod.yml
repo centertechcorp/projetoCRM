@@ -16,9 +16,16 @@ x-app: &app
   env_file: .env.production
   restart: unless-stopped
   networks: [crm]
+  # O banco é escolhido por perfil (COMPOSE_PROFILES, que o scripts/deploy.sh define a partir do
+  # DB_CONNECTION): "pgsql" ou "mariadb". Com MariaDB externo (o do servidor do dev) nenhum
+  # perfil sobe banco aqui. required:false deixa o app subir mesmo sem o serviço do perfil ativo.
   depends_on:
     pgsql:
       condition: service_healthy
+      required: false
+    mariadb:
+      condition: service_healthy
+      required: false
 
 services:
   app:
@@ -56,6 +63,7 @@ services:
       - app-storage:/app/storage
 
   pgsql:
+    profiles: [pgsql]
     image: postgres:18-alpine
     restart: unless-stopped
     networks: [crm]
@@ -68,6 +76,28 @@ services:
       - pgdata:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -q -d ${DB_DATABASE} -U ${DB_USERNAME}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MariaDB do próprio compose (use quando o servidor NÃO tem um MariaDB para vocês).
+  # DB_HOST=mariadb no .env.production. Com o MariaDB do dev, aponte DB_HOST para ele e não use este.
+  mariadb:
+    profiles: [mariadb]
+    image: mariadb:10.11
+    restart: unless-stopped
+    networks: [crm]
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    # Sem "ports": o banco NÃO fica exposto na internet, só a rede interna enxerga.
+    environment:
+      MARIADB_DATABASE: ${DB_DATABASE}
+      MARIADB_USER: ${DB_USERNAME}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-${DB_PASSWORD}}
+    volumes:
+      - mariadata:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -114,6 +144,7 @@ networks:
 
 volumes:
   pgdata:
+  mariadata:
   app-storage:
   caddy-data:
   caddy-config:
