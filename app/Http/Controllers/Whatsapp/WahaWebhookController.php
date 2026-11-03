@@ -50,15 +50,16 @@ class WahaWebhookController extends Controller
     }
 
     /**
-     * Sem WAHA_WEBHOOK_HMAC_KEY configurada, aceita sem validar (comportamento atual, o WAHA
-     * ainda não assina). Assim que a chave for configurada dos dois lados, passa a exigir.
+     * Sem WAHA_WEBHOOK_HMAC_KEY configurada, aceita sem validar fora de produção (dev local,
+     * onde o WAHA pode não assinar). Em produção a chave é obrigatória: sem ela qualquer um
+     * que descobrir a URL poderia injetar mensagens falsas.
      */
     private function signatureIsValid(Request $request): bool
     {
         $secret = config('whatsapp.waha.webhook_hmac_key');
 
         if (! is_string($secret) || $secret === '') {
-            return true;
+            return ! app()->isProduction();
         }
 
         $header = (string) $request->header('X-Webhook-Hmac');

@@ -63,6 +63,18 @@ class WahaWebhookTest extends TestCase
         Queue::assertNotPushed(ProcessWahaWebhook::class);
     }
 
+    public function test_webhook_refuses_everything_in_production_when_no_hmac_key_is_configured(): void
+    {
+        $this->app['env'] = 'production';
+        config(['whatsapp.waha.webhook_hmac_key' => '']);
+        Queue::fake();
+
+        $response = $this->postJson('/api/whatsapp/waha/center', json_decode($this->payload(), true));
+
+        $response->assertStatus(401);
+        Queue::assertNotPushed(ProcessWahaWebhook::class);
+    }
+
     public function test_webhook_is_open_when_no_hmac_key_is_configured(): void
     {
         config(['whatsapp.waha.webhook_hmac_key' => '']);

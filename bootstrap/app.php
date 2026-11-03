@@ -13,7 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Em produção o app fica atrás de um proxy HTTPS (Caddy, na rede interna do Docker):
+        // sem isso o Laravel enxerga http e gera URLs, redirecionamentos e cookies errados.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
