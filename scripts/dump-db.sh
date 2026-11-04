@@ -21,7 +21,9 @@ else
     echo "Aguardando o MariaDB ficar pronto..."
     until docker exec "$CONTAINER" healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1; do sleep 1; done
     OUT_FILE="$OUT_DIR/centercorp_mariadb_${STAMP}.sql"
-    docker exec "$CONTAINER" sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines --triggers "$MARIADB_DATABASE"' > "$OUT_FILE"
+    # O sed tira o DEFINER da view (ficaria preso ao usuário daqui e quebraria a restauração em outro servidor).
+    docker exec "$CONTAINER" sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines --triggers "$MARIADB_DATABASE"' \
+        | sed -E 's#/\*!50013 DEFINER=`[^`]*`@`[^`]*` SQL SECURITY DEFINER \*/#/*!50013 SQL SECURITY INVOKER */#' > "$OUT_FILE"
 fi
 
 echo "Dump gerado em: $OUT_FILE"

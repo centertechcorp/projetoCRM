@@ -183,6 +183,14 @@ class MariaDbCompatibilityTest extends TestCase
         $this->assertSame('WhatsApp CENTER', $row->conta);
     }
 
+    public function test_the_messages_view_does_not_depend_on_who_created_it(): void
+    {
+        $type = DB::scalar("select security_type from information_schema.views where table_schema = database() and table_name = 'whatsapp_messages_view'");
+
+        // INVOKER: restaurar o banco em outro servidor/usuário não quebra a view.
+        $this->assertSame('INVOKER', $type);
+    }
+
     public function test_timestamps_are_stored_and_read_back_without_a_three_hour_shift(): void
     {
         $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
