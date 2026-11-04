@@ -102,7 +102,10 @@ services:
       timeout: 5s
       retries: 5
 
+  # Os dois WAHA abaixo só sobem com WAHA_MODE=bundled (perfil "waha", ligado pelo scripts/deploy.sh).
+  # Com WAHA_MODE=external o CRM usa o WAHA que já existe (URL/chave/sessão no .env.production).
   waha-center:
+    profiles: [waha]
     image: devlikeapro/waha
     restart: unless-stopped
     networks: [crm]
@@ -123,6 +126,7 @@ services:
       - waha-center-sessions:/app/.sessions
 
   waha-genius:
+    profiles: [waha]
     image: devlikeapro/waha
     restart: unless-stopped
     networks: [crm]

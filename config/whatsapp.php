@@ -74,12 +74,12 @@ return [
             'center' => [
                 'base_url' => env('WAHA_CENTER_BASE_URL', 'http://host.docker.internal:3001'),
                 'api_key' => env('WAHA_CENTER_API_KEY'),
-                'session' => 'CENTER',
+                'session' => env('WAHA_CENTER_SESSION', 'CENTER'),
             ],
             'genius' => [
                 'base_url' => env('WAHA_GENIUS_BASE_URL', 'http://host.docker.internal:3002'),
                 'api_key' => env('WAHA_GENIUS_API_KEY'),
-                'session' => 'GENIUS',
+                'session' => env('WAHA_GENIUS_SESSION', 'GENIUS'),
             ],
         ],
     ],

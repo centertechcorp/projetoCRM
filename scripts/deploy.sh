@@ -8,6 +8,9 @@
 #   DB_CONNECTION=pgsql                      → sobe o PostgreSQL do compose
 #   DB_CONNECTION=mariadb + DB_HOST=mariadb  → sobe o MariaDB do compose
 #   DB_CONNECTION=mariadb + outro DB_HOST    → MariaDB externo (o do servidor); nenhum banco sobe aqui
+# O WAHA vem do .env.production:
+#   WAHA_MODE=bundled (padrão) → sobe os dois WAHA (CENTER e GENIUS) junto
+#   WAHA_MODE=external         → usa um WAHA que já existe (WAHA_*_BASE_URL / _API_KEY / _SESSION)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -27,6 +30,14 @@ case "${DB_CONNECTION}:${DB_HOST}" in
     mariadb:mariadb) export COMPOSE_PROFILES=mariadb; LOCAL_DB=mariadb ;;
     mariadb:*)    export COMPOSE_PROFILES="";      LOCAL_DB="" ;;
     *) echo "DB_CONNECTION inválido no .env.production: '${DB_CONNECTION}' (use pgsql ou mariadb)." >&2; exit 1 ;;
+esac
+
+WAHA_MODE="$(env_value WAHA_MODE)"
+WAHA_MODE="${WAHA_MODE:-bundled}"
+case "${WAHA_MODE}" in
+    bundled)  COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}waha"; export COMPOSE_PROFILES ;;
+    external) ;;
+    *) echo "WAHA_MODE inválido no .env.production: '${WAHA_MODE}' (use bundled ou external)." >&2; exit 1 ;;
 esac
 
 if [ "${DB_CONNECTION}" = "mariadb" ] && [ "${DB_HOST}" = "TROQUE" ]; then
@@ -69,3 +80,9 @@ $COMPOSE up -d
 $COMPOSE exec -T queue php artisan queue:restart || true
 
 $COMPOSE ps
+
+if [ "${WAHA_MODE}" = "external" ]; then
+    echo
+    echo "WAHA externo: confira a conexão e o webhook (só leitura) com:"
+    echo "  $COMPOSE exec -T app php artisan whatsapp:waha:check"
+fi
