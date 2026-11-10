@@ -3,7 +3,7 @@
 @section('title', 'Entrar')
 
 @section('content')
-<div class="mx-auto mt-16 max-w-sm">
+<div class="mx-auto mt-8 max-w-sm sm:mt-16">
     <h1 class="mb-6 text-xl font-semibold tracking-tight dark:text-slate-100">Entrar no CRM</h1>
 
     @if ($errors->any())
@@ -18,13 +18,13 @@
         <div>
             <label for="email" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">E-mail</label>
             <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus
-                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
         </div>
 
         <div>
             <label for="password" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Senha</label>
             <input id="password" name="password" type="password" required
-                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
         </div>
 
         <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">

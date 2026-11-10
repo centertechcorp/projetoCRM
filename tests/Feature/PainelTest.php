@@ -9,6 +9,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\WhatsappAccount;
 use App\Models\WhatsappChat;
+use App\Models\WhatsappMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -652,6 +653,28 @@ class PainelTest extends TestCase
         // nativo do navegador tem atraso fixo e fora do nosso controle.
         $response->assertSee('data-tooltip="Aprova essa sugestão', false);
         $response->assertDontSee(' title="', false);
+    }
+
+    public function test_search_finds_a_lead_by_a_word_said_in_its_conversation(): void
+    {
+        $store = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = WhatsappAccount::create(['store_id' => $store->id, 'label' => 'A', 'provider' => 'waha', 'provider_account_ref' => 's']);
+        $make = function (string $name, string $phone, string $said) use ($store, $account) {
+            $chat = WhatsappChat::create(['whatsapp_account_id' => $account->id, 'chat_key' => $phone,
+                'jid' => "{$phone}@s.whatsapp.net", 'kind' => 'individual']);
+            WhatsappMessage::create(['whatsapp_account_id' => $account->id, 'whatsapp_chat_id' => $chat->id,
+                'external_id' => $phone, 'direction' => 'in', 'type' => 'text', 'body' => $said, 'sent_at' => now(), 'source' => 'waha']);
+            $lead = $this->makeLead($store, $name, $phone);
+            $lead->update(['whatsapp_chat_id' => $chat->id]);
+        };
+        $make('Ester', '5534999990021', 'Vocês parcela no boleto?');
+        $make('Joana', '5534999990022', 'Tem capinha?');
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $html = $this->actingAs($user)->getJson('/painel?tab=reconnect&search=boleto')->json('html');
+
+        $this->assertStringContainsString('Ester', $html);
+        $this->assertStringNotContainsString('Joana', $html);
     }
 
     private function leadWithFollowup(Store $store, string $name, string $phone, string $status): Lead

@@ -43,7 +43,9 @@ class PainelReportController extends Controller
             ->when($storeId, fn ($q) => $q->whereHas('account', fn ($a) => $a->where('store_id', $storeId)))
             ->when($search !== '', fn ($q) => $q->whereHas('chat', fn (Builder $c) => $c
                 ->whereLike('display_name', "%{$search}%")
-                ->orWhereLike('phone', "%{$search}%")))
+                ->orWhereLike('phone', "%{$search}%")
+                // Conversa que tem a palavra em qualquer mensagem (ex.: "boleto").
+                ->orWhereHas('messages', fn (Builder $m) => $m->whereLike('body', "%{$search}%"))))
             ->orderBy('sent_at')
             ->get();
 

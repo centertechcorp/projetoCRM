@@ -3,8 +3,8 @@
         Nenhum lead nesta aba ainda.
     </p>
 @else
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+    <div class="rtable-wrap overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <table class="rtable min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
             <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <tr>
                     <th class="px-4 py-1.5">Cliente</th>

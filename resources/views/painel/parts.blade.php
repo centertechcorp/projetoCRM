@@ -11,7 +11,7 @@
 @if ($partsByCategory)
     <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <input type="search" id="partsSearchInput" placeholder="Buscar peça (ex: iphone 13)" autocomplete="off"
-            class="mb-3 w-full max-w-xs rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500">
+            class="mb-3 w-full max-w-xs rounded-lg border border-slate-300 px-3 py-1.5 text-base sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500">
 
         <div id="partsSearchResults" class="hidden mb-2 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 text-xs dark:divide-slate-800 dark:border-slate-700"></div>
 
@@ -34,7 +34,7 @@
                         <thead class="bg-slate-50 text-left font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                             <tr>
                                 <th class="px-4 py-1">Marca</th>
-                                <th class="py-1 pl-[5.5rem] pr-4 text-center">Qtd</th>
+                                <th class="py-1 pl-6 pr-4 text-center sm:pl-[5.5rem]">Qtd</th>
                                 <th class="px-4 py-1 text-right">R$</th>
                             </tr>
                         </thead>
@@ -44,7 +44,7 @@
                                     <td class="px-4 py-1">
                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $row['marca'] }}</span>
                                     </td>
-                                    <td class="py-1 pl-[5.5rem] pr-4 text-center text-slate-500 dark:text-slate-400">{{ $row['qtd'] }}</td>
+                                    <td class="py-1 pl-6 pr-4 text-center text-slate-500 sm:pl-[5.5rem] dark:text-slate-400">{{ $row['qtd'] }}</td>
                                     <td class="px-4 py-1 text-right font-medium text-slate-900 dark:text-slate-100">
                                         R$ {{ number_format($row['min'], 2, ',', '.') }}@if ($row['min'] != $row['max']) <span class="text-slate-400 dark:text-slate-500">–</span> {{ number_format($row['max'], 2, ',', '.') }}@endif
                                     </td>

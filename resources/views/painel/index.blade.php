@@ -41,8 +41,8 @@
 @endsection
 
 @section('content')
-<div class="mb-6 flex flex-nowrap items-center justify-between gap-4">
-    <nav class="flex min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg bg-slate-200/60 p-1 text-sm dark:bg-slate-800/60">
+<div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+    <nav class="flex min-w-0 max-w-full flex-nowrap gap-1 overflow-x-auto rounded-lg bg-slate-200/60 p-1 text-sm dark:bg-slate-800/60">
         @foreach ($tabs as $t)
             <a href="{{ route('painel.index', ['tab' => $t, 'store' => $selectedStore, 'search' => $search, 'priority' => $priority, 'category' => $category]) }}"
                 class="whitespace-nowrap rounded-md px-3 py-1.5 font-medium {{ $tab === $t ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100' }}">
@@ -51,25 +51,25 @@
         @endforeach
     </nav>
 
-    <form method="GET" class="flex-shrink-0 text-sm">
+    <form method="GET" class="w-full text-sm md:w-auto md:flex-shrink-0">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <input type="hidden" name="store" value="{{ $selectedStore }}">
         <input type="hidden" name="priority" value="{{ $priority }}">
         <input type="hidden" name="category" value="{{ $category }}">
-        <input type="search" name="search" id="leadSearchInput" value="{{ $search }}" placeholder="Nome, telefone ou produto/orçamento"
-            class="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500" autocomplete="off">
+        <input type="search" name="search" id="leadSearchInput" value="{{ $search }}" placeholder="Nome, telefone, produto ou mensagem"
+            class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-base dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 md:w-64 md:text-sm" autocomplete="off">
     </form>
 </div>
 
-<div class="mb-4 flex flex-wrap items-center gap-4">
-    <form method="GET" class="flex items-center gap-2 text-sm">
+<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+    <form method="GET" class="flex w-full items-center gap-2 text-sm sm:w-auto">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <input type="hidden" name="store" value="{{ $selectedStore }}">
         <input type="hidden" name="search" value="{{ $search }}">
         <input type="hidden" name="category" value="{{ $category }}">
         <label for="priorityFilter" class="font-medium text-slate-600 dark:text-slate-400">Prioridade:</label>
         <select name="priority" id="priorityFilter" onchange="this.form.submit()"
-            class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            class="min-w-0 flex-1 sm:flex-none rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
             <option value="">Todas as prioridades</option>
             <option value="alta" @selected($priority === 'alta')>🔥 Alta</option>
             <option value="media" @selected($priority === 'media')>🟡 Média</option>
@@ -77,14 +77,14 @@
         </select>
     </form>
 
-    <form method="GET" class="flex items-center gap-2 text-sm">
+    <form method="GET" class="flex w-full items-center gap-2 text-sm sm:w-auto">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <input type="hidden" name="store" value="{{ $selectedStore }}">
         <input type="hidden" name="search" value="{{ $search }}">
         <input type="hidden" name="priority" value="{{ $priority }}">
         <label for="categoryFilter" class="font-medium text-slate-600 dark:text-slate-400">Produto:</label>
         <select name="category" id="categoryFilter" onchange="this.form.submit()"
-            class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            class="min-w-0 flex-1 sm:flex-none rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
             <option value="">Todos os produtos</option>
             <option value="celular" @selected($category === 'celular')>📱 Celular</option>
             <option value="peca" @selected($category === 'peca')>🔧 Peças</option>

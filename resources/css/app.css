@@ -9,3 +9,110 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* ---------------------------------------------------------------------------
+   Celular: tabelas viram cartões (só visual; a estrutura e os scripts continuam iguais)
+   --------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+    .rtable-wrap {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .rtable,
+    .rtable tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .rtable thead {
+        display: none;
+    }
+
+    .rtable tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        padding: 1rem;
+        border: 1px solid rgb(226 232 240);
+        border-radius: 0.75rem;
+        background: #fff;
+        box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+    }
+
+    .dark .rtable tbody tr {
+        border-color: rgb(30 41 59);
+        background: rgb(15 23 42);
+        box-shadow: none;
+    }
+
+    .rtable td {
+        display: block;
+        min-width: 0;
+        padding: 0;
+        white-space: normal;
+    }
+
+    /* 1º e 2º campos lado a lado; o resto ocupa a linha inteira */
+    .rtable tbody tr > td:nth-child(n + 3) {
+        grid-column: 1 / -1;
+    }
+
+    .rtable td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 0.15rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: rgb(148 163 184);
+    }
+
+    .rtable tbody tr > td:last-child:not([data-label]) {
+        margin-top: 0.25rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgb(241 245 249);
+    }
+
+    .dark .rtable tbody tr > td:last-child:not([data-label]) {
+        border-top-color: rgb(30 41 59);
+    }
+
+    /* botões de ação lado a lado, com área de toque maior */
+    .lead-actions {
+        width: 100%;
+        min-width: 0 !important;
+        flex-direction: row;
+        flex-wrap: wrap;
+        margin-left: 0;
+    }
+
+    .lead-actions > form,
+    .lead-actions > button {
+        flex: 1 1 7.5rem;
+    }
+
+    .lead-actions button {
+        min-height: 2.5rem;
+        font-size: 0.875rem;
+    }
+
+    /* aviso que substitui a linha (ação/desfazer) */
+    .rtable tbody tr.js-row-toast {
+        display: block;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .rtable tbody tr.js-row-toast > td {
+        display: flex;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+}

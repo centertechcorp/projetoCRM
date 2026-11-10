@@ -9,9 +9,9 @@
         <h1 class="text-lg font-semibold dark:text-slate-100">Relatório — {{ $date->format('d/m/Y') }}</h1>
     </div>
 
-    <form method="GET" class="flex items-center gap-2 text-sm">
+    <form method="GET" class="flex w-full flex-wrap items-center gap-2 text-sm md:w-auto">
         <input type="search" name="search" id="reportSearchInput" value="{{ $search }}" placeholder="Nome, telefone ou mensagem"
-            class="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500" autocomplete="off">
+            class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-base dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 md:w-64 md:text-sm" autocomplete="off">
         <input type="date" name="date" value="{{ $date->format('Y-m-d') }}" onchange="this.form.submit()"
             class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
         @if ($stores->isNotEmpty())
@@ -37,7 +37,7 @@
 <div class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Ações no período</h2>
-        <div class="flex items-center gap-2 text-sm">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
             <label class="text-slate-500 dark:text-slate-400">De
                 <input type="date" id="actionsFrom" value="{{ $chartDefaultFrom }}"
                     class="ml-1 rounded-lg border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
@@ -50,10 +50,10 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-6">
-        <div class="h-56 w-56 flex-shrink-0">
+        <div class="mx-auto h-56 w-56 flex-shrink-0 sm:mx-0">
             <canvas id="actionsDonutChart"></canvas>
         </div>
-        <ul id="actionsLegend" class="flex-1 space-y-2 text-sm"></ul>
+        <ul id="actionsLegend" class="w-full flex-1 space-y-2 text-sm sm:w-auto"></ul>
     </div>
 </div>
 

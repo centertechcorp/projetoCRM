@@ -3,7 +3,7 @@
     $rowClass = fn (string $base = '') => trim(($ajax ? 'js-row-action ' : '').$base);
 @endphp
 @if ($canDecide)
-    <div class="ml-auto flex w-fit flex-col gap-1.5" style="min-width: 5.1rem">
+    <div class="lead-actions ml-auto flex w-fit flex-col gap-1.5" style="min-width: 5.1rem">
         @if ($followup && in_array($followup->status, ['candidate', 'draft_ready']))
             <form method="POST" action="{{ route('painel.followups.approve', $followup) }}" class="{{ $rowClass() }}">
                 @csrf

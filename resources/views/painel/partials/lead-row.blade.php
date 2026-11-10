@@ -29,7 +29,7 @@
 
     $categoryLabel = ['celular' => '📱 Celular', 'peca' => '🔧 Peça'];
 @endphp
-<tr class="align-top" data-lead-row="{{ $lead->id }}">
+<tr class="align-top lead-row" data-lead-row="{{ $lead->id }}">
     <td class="px-4 py-3">
         <div class="font-medium text-slate-900 dark:text-slate-100">{{ $lead->customer->name ?: '(sem nome)' }}</div>
         <div class="text-slate-500 dark:text-slate-400">{{ $lead->customer->phone }}</div>
@@ -40,7 +40,7 @@
             {{ $statusLabel[$lead->status] ?? $lead->status }}
         </span>
     </td>
-    <td class="px-4 py-3">
+    <td class="px-4 py-3" data-label="Produto / Orçamento">
         <div class="dark:text-slate-100">{{ $lead->product_interest ?: '—' }}</div>
         @if ($lead->quoted_amount)
             <div class="text-slate-500 dark:text-slate-400">R$ {{ number_format($lead->quoted_amount, 2, ',', '.') }}</div>
@@ -60,10 +60,10 @@
             <span class="mt-1 inline-block text-xs text-slate-500 dark:text-slate-400">{{ $categoryLabel[$lead->product_category] }}</span>
         @endif
     </td>
-    <td class="px-4 py-3 text-slate-500 dark:text-slate-400">
+    <td class="px-4 py-3 text-slate-500 dark:text-slate-400" data-label="Data">
         {{ $lead->last_contact_at?->format('d/m H:i') ?? '—' }}
     </td>
-    <td class="px-4 py-3">
+    <td class="px-4 py-3" data-label="Sugestão de reabordagem">
         <div class="mb-1 flex items-center gap-1.5">
             @if ($priorityLabel)
                 <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {{ $priorityBadge[$priorityLabel] }}"
@@ -84,16 +84,16 @@
                 {{ $reasonLabel[$followup->reason] ?? $followup->reason }} · {{ $followup->status }}
             </div>
             @if ($followup->suggested_message)
-                <p class="max-w-xs text-slate-700 dark:text-slate-300">{{ $followup->suggested_message }}</p>
+                <p class="max-w-xs max-md:max-w-none text-slate-700 dark:text-slate-300">{{ $followup->suggested_message }}</p>
             @else
                 @php $lastCustomerMessage = $lead->chat?->messages()->where('direction', 'in')->latest('sent_at')->first(); @endphp
                 @if ($lastCustomerMessage)
-                    <p class="max-w-xs text-slate-700 dark:text-slate-300">
+                    <p class="max-w-xs max-md:max-w-none text-slate-700 dark:text-slate-300">
                         <span class="text-slate-400 dark:text-slate-500">{{ $lastCustomerMessage->sent_at->format('d/m H:i') }} ·</span>
                         {{ $lastCustomerMessage->body !== '' ? $lastCustomerMessage->body : '('.$lastCustomerMessage->type.', sem texto)' }}
                     </p>
                 @else
-                    <p class="max-w-xs italic text-slate-400 dark:text-slate-500">Sem mensagem do cliente ainda.</p>
+                    <p class="max-w-xs max-md:max-w-none italic text-slate-400 dark:text-slate-500">Sem mensagem do cliente ainda.</p>
                 @endif
             @endif
         @else

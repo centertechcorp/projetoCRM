@@ -142,7 +142,9 @@ class PainelController extends Controller
         return $query->where(fn (Builder $q) => $q
             ->whereHas('customer', fn ($c) => $c->whereLike('name', "%{$term}%")
                 ->orWhereLike('phone', "%{$term}%"))
-            ->orWhereLike('product_interest', "%{$term}%"));
+            ->orWhereLike('product_interest', "%{$term}%")
+            // Também acha pelo que foi dito na conversa (ex.: "boleto"), de qualquer um dos lados.
+            ->orWhereHas('chat.messages', fn ($m) => $m->whereLike('body', "%{$term}%")));
     }
 
     public function approveFollowup(Request $request, LeadFollowup $followup, LeadDecisionService $decisions): RedirectResponse|JsonResponse

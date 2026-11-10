@@ -88,6 +88,22 @@ class PainelReportTest extends TestCase
         $response->assertSee('buscando em todos os dias');
     }
 
+    public function test_searching_finds_a_conversation_by_a_word_in_any_message(): void
+    {
+        $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);
+        $account = $this->makeAccount($center, 'CENTER');
+        $withWord = $this->makeChat($account, 'Ester', '5534999990001');
+        $this->makeMessage($account, $withWord, 'in', 'Vocês parcela no BOLETO?', now()->subDays(10));
+        $other = $this->makeChat($account, 'Joana', '5534999990002');
+        $this->makeMessage($account, $other, 'in', 'Tem capinha?', now()->subDays(10));
+
+        $user = $this->makeUser('owner@center.com', 'senha-boa-123');
+
+        $response = $this->actingAs($user)->get('/painel/relatorio?search=boleto');
+
+        $response->assertOk()->assertSee('Ester')->assertDontSee('Joana');
+    }
+
     public function test_live_search_with_accept_json_returns_only_the_results_partial(): void
     {
         $center = Store::create(['code' => 'CENTER', 'name' => 'CENTER']);

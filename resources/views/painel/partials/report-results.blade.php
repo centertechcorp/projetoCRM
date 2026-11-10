@@ -30,8 +30,8 @@
         Nenhuma mensagem nesse dia.
     </p>
 @else
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+    <div class="rtable-wrap overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <table class="rtable min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
             <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <tr>
                     <th class="px-4 py-3">Hora</th>
@@ -53,7 +53,7 @@
                     <tr>
                         <td class="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-400">{{ $conversation['last_sent_at']->format('H:i') }}</td>
                         <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{{ $conversation['store']->code }}</td>
-                        <td class="whitespace-nowrap px-4 py-3">
+                        <td class="whitespace-nowrap px-4 py-3" data-label="Contato">
                             <div class="text-slate-900 dark:text-slate-100">{{ $chat->display_name ?: '(sem nome)' }}</div>
                             <div class="text-slate-500 dark:text-slate-400">{{ $chat->phone ?? $chat->chat_key }}</div>
                             @if ($chat->phone)
@@ -72,11 +72,11 @@
                                 #{{ $i + 1 }} {{ $priorityIcon[$conversation['priority_label']] }} {{ $conversation['priority_label'] }} · {{ $conversation['score'] }}
                             </span>
                         </td>
-                        <td class="whitespace-nowrap px-4 py-3">
+                        <td class="whitespace-nowrap px-4 py-3" data-label="Direção">
                             <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ $conversation['recebidas'] }} recebidas</span>
                             <span class="mt-1 block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 w-fit">{{ $conversation['enviadas'] }} enviadas</span>
                         </td>
-                        <td class="max-w-md px-4 py-3 text-slate-700 dark:text-slate-300">
+                        <td class="max-w-md px-4 py-3 text-slate-700 dark:text-slate-300" data-label="Mensagem">
                             <details>
                                 <summary class="cursor-pointer select-none">
                                     <span class="text-slate-400 dark:text-slate-500">({{ $conversation['messages']->count() }})</span>
