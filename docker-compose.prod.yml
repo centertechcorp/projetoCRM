@@ -31,9 +31,9 @@ services:
   app:
     <<: *app
     ports:
-      - '${HTTP_PORT:-80}:80'
-      - '${HTTPS_PORT:-443}:443'
-      - '${HTTPS_PORT:-443}:443/udp'
+      - '${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80'
+      - '${HTTP_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443'
+      - '${HTTP_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443/udp'
     volumes:
       - app-storage:/app/storage
       - caddy-data:/data
@@ -108,6 +108,8 @@ services:
     profiles: [waha]
     image: devlikeapro/waha
     restart: unless-stopped
+    # Teto de memória: em servidor compartilhado, evita que um WAHA faça o kernel matar outros serviços.
+    mem_limit: ${WAHA_MEM_LIMIT:-1536m}
     networks: [crm]
     # Dashboard (QR code) só pelo próprio servidor: acesse via túnel SSH
     #   ssh -L 3001:127.0.0.1:3001 usuario@servidor  →  http://localhost:3001
@@ -129,6 +131,8 @@ services:
     profiles: [waha]
     image: devlikeapro/waha
     restart: unless-stopped
+    # Teto de memória: em servidor compartilhado, evita que um WAHA faça o kernel matar outros serviços.
+    mem_limit: ${WAHA_MEM_LIMIT:-1536m}
     networks: [crm]
     ports:
       - '127.0.0.1:${WAHA_GENIUS_LOCAL_PORT:-3002}:3000'
