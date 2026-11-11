@@ -51,6 +51,9 @@ services:
     <<: *app
     entrypoint: ['app-entrypoint']
     command: ['php', 'artisan', 'queue:work', '--sleep=1', '--tries=3', '--max-time=3600']
+    # Sem servidor web: o healthcheck herdado da imagem (porta 2019 do Caddy) sempre falharia.
+    healthcheck:
+      disable: true
     volumes:
       - app-storage:/app/storage
 
@@ -59,6 +62,8 @@ services:
     <<: *app
     entrypoint: ['app-entrypoint']
     command: ['php', 'artisan', 'schedule:work']
+    healthcheck:
+      disable: true
     volumes:
       - app-storage:/app/storage
 
