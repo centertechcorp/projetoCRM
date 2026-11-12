@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Painel\BoletoController;
 use App\Http\Controllers\Painel\PainelController;
 use App\Http\Controllers\Painel\PainelReportController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/painel/leads/{lead}/delete', [PainelController::class, 'destroy'])->name('painel.leads.delete');
     Route::post('/painel/leads/{lead}/restore', [PainelController::class, 'restore'])->name('painel.leads.restore')->withTrashed();
     Route::post('/painel/leads/{lead}/category', [PainelController::class, 'setCategory'])->name('painel.leads.category');
+    Route::get('/painel/boletos', [BoletoController::class, 'index'])->name('painel.boletos');
+    Route::get('/painel/boletos/novos', [BoletoController::class, 'check'])->name('painel.boletos.check');
     Route::get('/painel/relatorio', [PainelReportController::class, 'index'])->name('painel.report');
     Route::get('/painel/relatorio/acoes', [PainelReportController::class, 'actionsSummary'])->name('painel.report.actions');
     Route::post('/painel/chats/{chat}/ignore', [PainelReportController::class, 'ignoreChat'])->name('painel.chats.ignore');

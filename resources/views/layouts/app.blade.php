@@ -71,6 +71,10 @@
         @yield('content')
     </main>
 
+    @auth
+        @include('partials.boleto-alert')
+    @endauth
+
     <script>
         document.getElementById('themeToggle')?.addEventListener('click', function () {
             const isDark = document.documentElement.classList.toggle('dark');

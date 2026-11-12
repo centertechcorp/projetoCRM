@@ -18,6 +18,11 @@
         Relatório do dia
     </a>
 
+    <a href="{{ route('painel.boletos') }}"
+        class="whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+        🧾 Boletos
+    </a>
+
     <a href="{{ route('painel.parts.index') }}"
         class="whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
         🔧 Consultar preço/produtos
