@@ -58,6 +58,10 @@ class PainelController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        // Busca as mensagens recentes de todos os leads numa consulta só (senão a nota de cada
+        // lead faz uma consulta própria — a aba Reconectar chegava a mais de mil consultas).
+        $scorer->preload($leads);
+
         // Filtro de prioridade (Alta/Média/Baixa) é calculado por regra, não dá pra fazer
         // em SQL — filtra em cima da coleção já carregada.
         if ($priority !== '') {

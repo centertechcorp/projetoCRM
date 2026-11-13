@@ -86,7 +86,7 @@
             @if ($followup->suggested_message)
                 <p class="max-w-xs max-md:max-w-none text-slate-700 dark:text-slate-300">{{ $followup->suggested_message }}</p>
             @else
-                @php $lastCustomerMessage = $lead->chat?->messages()->where('direction', 'in')->latest('sent_at')->first(); @endphp
+                @php /* Com a lista pré-carregada (PainelController) a última mensagem do cliente já está na memória; senão busca. */ $lastCustomerMessage = $lead->relationLoaded('recentInbound') ? $lead->getRelation('recentInbound')->first() : $lead->chat?->messages()->where('direction', 'in')->latest('sent_at')->first(); @endphp
                 @if ($lastCustomerMessage)
                     <p class="max-w-xs max-md:max-w-none text-slate-700 dark:text-slate-300">
                         <span class="text-slate-400 dark:text-slate-500">{{ $lastCustomerMessage->sent_at->format('d/m H:i') }} ·</span>

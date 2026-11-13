@@ -110,6 +110,18 @@ class BoletoClientesTest extends TestCase
             ->assertSee('href="'.route('painel.index').'" id="boletoBack"', false);
     }
 
+    public function test_report_and_parts_pages_also_go_back_with_history_back(): void
+    {
+        $user = $this->makeUser('owner@center.com');
+
+        foreach (['/painel/relatorio', '/painel/pecas'] as $path) {
+            $this->actingAs($user)->get($path)
+                ->assertOk()
+                ->assertSee('history.back()', false)
+                ->assertSee('href="'.route('painel.index').'" id="backLink"', false);
+        }
+    }
+
     public function test_popup_is_included_in_the_layout_for_logged_users(): void
     {
         $this->actingAs($this->makeUser('owner@center.com'))->get('/painel')

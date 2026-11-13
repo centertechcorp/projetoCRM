@@ -3,7 +3,9 @@
 namespace App\Services\Leads;
 
 use App\Models\Lead;
+use App\Models\WhatsappMessage;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Pontua (0-100) quão crucial é reabordar um lead agora, olhando as últimas mensagens do
@@ -22,14 +24,60 @@ class LeadPriorityScorer
 
     private const MAX_MESSAGES_CONSIDERED = 10;
 
-    public function score(Lead $lead): int
+    /**
+     * Carrega, numa consulta só, as últimas mensagens recebidas de todos os chats desses leads e
+     * as deixa penduradas em cada Lead (relação "recentInbound"). Sem isso, score() e reason()
+     * fazem uma consulta por lead — com centenas de leads na aba, a página demora segundos.
+     * Quem não chamar preload() continua funcionando, só mais devagar (uma consulta por lead).
+     *
+     * @param  Collection<int, Lead>  $leads
+     */
+    public function preload(Collection $leads): void
     {
-        $messages = $lead->chat
+        $chatIds = $leads->pluck('whatsapp_chat_id')->filter()->unique()->values();
+
+        $byChat = collect();
+
+        if ($chatIds->isNotEmpty()) {
+            $ranked = WhatsappMessage::query()
+                ->select(['id', 'whatsapp_chat_id', 'type', 'body', 'sent_at'])
+                ->selectRaw('ROW_NUMBER() OVER (PARTITION BY whatsapp_chat_id ORDER BY sent_at DESC, id DESC) as rn')
+                ->where('direction', 'in')
+                ->whereIn('whatsapp_chat_id', $chatIds);
+
+            $byChat = WhatsappMessage::query()
+                ->fromSub($ranked, 'whatsapp_messages')
+                ->where('rn', '<=', self::MAX_MESSAGES_CONSIDERED)
+                ->orderBy('whatsapp_chat_id')
+                ->orderByDesc('sent_at')
+                ->orderByDesc('id')
+                ->get()
+                ->groupBy('whatsapp_chat_id');
+        }
+
+        foreach ($leads as $lead) {
+            $lead->setRelation('recentInbound', $byChat->get($lead->whatsapp_chat_id, collect()));
+        }
+    }
+
+    /** @return Collection<int, WhatsappMessage> */
+    private function recentInbound(Lead $lead): Collection
+    {
+        if ($lead->relationLoaded('recentInbound')) {
+            return $lead->getRelation('recentInbound');
+        }
+
+        return $lead->chat
             ?->messages()
             ->where('direction', 'in')
             ->orderByDesc('sent_at')
             ->limit(self::MAX_MESSAGES_CONSIDERED)
             ->get() ?? collect();
+    }
+
+    public function score(Lead $lead): int
+    {
+        $messages = $this->recentInbound($lead);
 
         $body = self::normalize($messages->pluck('body')->implode(' '));
 
@@ -94,12 +142,7 @@ class LeadPriorityScorer
 
     public function reason(Lead $lead): ?string
     {
-        $messages = $lead->chat
-            ?->messages()
-            ->where('direction', 'in')
-            ->orderByDesc('sent_at')
-            ->limit(self::MAX_MESSAGES_CONSIDERED)
-            ->get() ?? collect();
+        $messages = $this->recentInbound($lead);
 
         $body = self::normalize($messages->pluck('body')->implode(' '));
 

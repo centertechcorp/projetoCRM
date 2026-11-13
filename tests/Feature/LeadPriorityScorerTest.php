@@ -11,6 +11,8 @@ use App\Models\WhatsappMessage;
 use App\Services\Leads\LeadPriorityScorer;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class LeadPriorityScorerTest extends TestCase
@@ -158,6 +160,76 @@ class LeadPriorityScorerTest extends TestCase
         $this->assertNull($this->scorer()->reasonForMessages(collect()));
     }
 
+    public function test_preload_gives_the_same_score_reason_and_last_message_as_one_query_per_lead(): void
+    {
+        $bodies = array_map(fn (int $i) => "mensagem {$i}", range(1, 14));
+        $leads = collect([
+            $this->leadWithMessages(['Quanto fica no boleto?', 'e a entrega?']),
+            // Mais de 10 recebidas: só as 10 mais recentes contam (a pergunta antiga fica de fora).
+            $this->leadWithMessages(array_merge(['Tem desconto?'], $bodies)),
+            $this->leadWithMessages(['oi'], ['quoted_amount' => 900]),
+            $this->lead(),
+        ]);
+
+        // Mensagem enviada pela loja não entra na nota.
+        $chat = $leads[0]->chat;
+        $this->message($chat, 'out', CarbonImmutable::now(), 'Quanto? Boleto? Entrega?', 'out-1');
+
+        $scorer = $this->scorer();
+        $expected = $leads->map(fn (Lead $l) => [
+            $scorer->score($l),
+            $scorer->reason($l),
+            $l->chat?->messages()->where('direction', 'in')->latest('sent_at')->first()?->id,
+        ])->all();
+
+        $fresh = Lead::query()->whereIn('id', $leads->pluck('id'))->orderBy('id')->get();
+        $scorer->preload($fresh);
+
+        $actual = $fresh->map(fn (Lead $l) => [
+            $scorer->score($l),
+            $scorer->reason($l),
+            $l->getRelation('recentInbound')->first()?->id,
+        ])->all();
+
+        $this->assertSame($expected, $actual);
+    }
+
+    public function test_panel_runs_a_constant_number_of_queries_no_matter_how_many_leads(): void
+    {
+        $user = \App\Models\User::create([
+            'name' => 'Teste', 'email' => 'owner@center.com', 'password' => Hash::make('senha-boa-123'),
+            'role' => 'owner', 'owner_slot' => 1, 'can_decide' => true,
+        ]);
+
+        $queriesFor = function (int $leads) use ($user): int {
+            for ($i = 0; $i < $leads; $i++) {
+                $this->leadWithMessages(['Quanto fica no boleto?', 'tem iphone?']);
+            }
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($user)->get('/painel')->assertOk();
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $few = $queriesFor(3);
+        $many = $queriesFor(30);
+
+        $this->assertSame($few, $many, "Consultas cresceram com o nº de leads ({$few} → {$many}).");
+        $this->assertLessThan(30, $many);
+    }
+
+    private int $sequence = 0;
+
+    /** Número sequencial (sem colisão) para telefones e chaves de chat dos testes. */
+    private function nextNumber(): int
+    {
+        return ++$this->sequence;
+    }
+
     private function scorer(): LeadPriorityScorer
     {
         return app(LeadPriorityScorer::class);
@@ -167,7 +239,7 @@ class LeadPriorityScorerTest extends TestCase
     {
         return WhatsappChat::create([
             'whatsapp_account_id' => $this->account->id,
-            'chat_key' => '5534999990000'.random_int(0, 999),
+            'chat_key' => '5534999'.str_pad((string) $this->nextNumber(), 6, '0', STR_PAD_LEFT),
             'jid' => '5534999990000@c.us',
             'kind' => 'individual',
         ]);
@@ -176,7 +248,7 @@ class LeadPriorityScorerTest extends TestCase
     /** @param  array<string, mixed>  $attributes */
     private function lead(array $attributes = []): Lead
     {
-        $customer = Customer::create(['phone' => '55349999'.random_int(10000, 99999), 'name' => 'Cliente Teste']);
+        $customer = Customer::create(['phone' => '5511999'.str_pad((string) $this->nextNumber(), 6, '0', STR_PAD_LEFT), 'name' => 'Cliente Teste']);
 
         return Lead::create(array_merge([
             'customer_id' => $customer->id,

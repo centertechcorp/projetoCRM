@@ -4,7 +4,10 @@
 
 @section('content')
 <div class="mb-6 flex items-center gap-3">
-    <a href="{{ route('painel.index') }}" class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">&larr; Voltar</a>
+    {{-- Volta para onde a pessoa estava (sem recarregar) se veio de outra página do CRM; senão vai pro Painel. --}}
+    <a href="{{ route('painel.index') }}" id="backLink"
+        onclick="try { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) { event.preventDefault(); history.back(); } } catch (e) {}"
+        class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">&larr; Voltar</a>
     <h1 class="text-lg font-semibold dark:text-slate-100">🔧 Peças (Mix Atacado)</h1>
 </div>
 
