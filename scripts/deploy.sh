@@ -40,6 +40,11 @@ case "${WAHA_MODE}" in
     *) echo "WAHA_MODE inválido no .env.production: '${WAHA_MODE}' (use bundled ou external)." >&2; exit 1 ;;
 esac
 
+# Tailscale (acesso privado da equipe): só entra se houver TS_AUTHKEY no .env.production.
+if [ -n "$(env_value TS_AUTHKEY)" ]; then
+    COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}tailscale"; export COMPOSE_PROFILES
+fi
+
 if [ "${DB_CONNECTION}" = "mariadb" ] && [ "${DB_HOST}" = "TROQUE" ]; then
     echo "Preencha DB_HOST no .env.production (host do MariaDB)." >&2
     exit 1
