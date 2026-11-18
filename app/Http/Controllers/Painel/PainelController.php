@@ -129,11 +129,7 @@ class PainelController extends Controller
                 ->whereDoesntHave('followups', fn ($q) => $q->whereIn('status', [...self::PENDING_FOLLOWUP_STATUSES, 'approved']))
                 ->whereHas('followups', fn ($q) => $q->where('status', 'dismissed')),
             // O resto dos abertos: sugestão pendente ou ainda sem nenhuma decisão sua.
-            'reconnect' => $query->where('status', 'open')
-                ->whereDoesntHave('followups', fn ($q) => $q->where('status', 'approved'))
-                ->where(fn ($q) => $q
-                    ->whereHas('followups', fn ($f) => $f->whereIn('status', self::PENDING_FOLLOWUP_STATUSES))
-                    ->orWhereDoesntHave('followups', fn ($f) => $f->where('status', 'dismissed'))),
+            'reconnect' => $query->reconnect(),
             'won', 'lost' => $query->where('status', $tab),
             default => $query,
         };
