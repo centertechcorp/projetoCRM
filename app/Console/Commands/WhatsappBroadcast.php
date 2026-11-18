@@ -65,7 +65,10 @@ class WhatsappBroadcast extends Command
 
         $recipients = $this->recipients($stores);
         $alreadySent = $this->alreadySent($message);
-        $pending = $recipients->reject(fn (array $r) => in_array($r['chat_id'], $alreadySent, true))->values();
+        $noWhatsapp = $this->noWhatsappList();
+        $pending = $recipients
+            ->reject(fn (array $r) => in_array($r['chat_id'], $alreadySent, true) || in_array($r['phone'], $noWhatsapp, true))
+            ->values();
 
         $this->showSummary($message, $recipients, $pending);
 
@@ -193,7 +196,7 @@ class WhatsappBroadcast extends Command
         foreach ($recipients->groupBy('store') as $store => $group) {
             $this->components->twoColumnDetail("  {$store}", (string) $group->count());
         }
-        $this->components->twoColumnDetail('Já receberam este texto', (string) ($recipients->count() - $pending->count()));
+        $this->components->twoColumnDetail('Já receberam ou sem WhatsApp (pulados)', (string) ($recipients->count() - $pending->count()));
         $this->components->twoColumnDetail('Pendentes', (string) $pending->count());
 
         $sample = $pending->take(5)->map(fn (array $r) => $r['store'].' '.self::mask($r['phone']))->implode(', ');
@@ -220,7 +223,15 @@ class WhatsappBroadcast extends Command
 
         $store = (string) $stores->first();
 
-        if (! $this->deliver($store, $phone.'@c.us', $message)) {
+        $resolved = $this->resolveChatId($store, $phone);
+
+        if ($resolved['status'] === 'no_whatsapp') {
+            $this->components->error('Esse número não está no WhatsApp.');
+
+            return self::FAILURE;
+        }
+
+        if ($resolved['status'] !== 'ok' || ! $this->deliver($store, (string) $resolved['chat_id'], $message)) {
             $this->components->error("Falhou ao enviar o teste pela {$store}. Confira se a sessão está WORKING.");
 
             return self::FAILURE;
@@ -257,15 +268,30 @@ class WhatsappBroadcast extends Command
         $sent = 0;
         $failures = 0;
 
+        $skipped = 0;
+
         foreach ($batch as $i => $recipient) {
-            if ($this->deliver($recipient['store'], $recipient['chat_id'], $message)) {
+            $label = sprintf('[%d/%d]', $i + 1, $batch->count());
+            $who = $recipient['store'].' '.self::mask($recipient['phone']);
+            $resolved = $this->resolveChatId($recipient['store'], $recipient['phone']);
+
+            if ($resolved['status'] === 'no_whatsapp') {
+                // Não é falha da sessão: o número só não está no WhatsApp. Anota para nunca mais tentar.
+                $this->markNoWhatsapp($recipient['phone']);
+                $skipped++;
+                $this->line("{$label} sem WhatsApp, pulado {$who}");
+
+                continue;
+            }
+
+            if ($resolved['status'] === 'ok' && $this->deliver($recipient['store'], (string) $resolved['chat_id'], $message)) {
                 $this->markSent($message, $recipient['chat_id']);
                 $sent++;
                 $failures = 0;
-                $this->line(sprintf('[%d/%d] enviado %s %s', $i + 1, $batch->count(), $recipient['store'], self::mask($recipient['phone'])));
+                $this->line("{$label} enviado {$who}");
             } else {
                 $failures++;
-                $this->components->warn(sprintf('[%d/%d] falhou %s %s', $i + 1, $batch->count(), $recipient['store'], self::mask($recipient['phone'])));
+                $this->components->warn("{$label} falhou {$who}");
 
                 if ($failures >= self::MAX_CONSECUTIVE_FAILURES) {
                     $this->components->error('Parei: '.self::MAX_CONSECUTIVE_FAILURES.' falhas seguidas (sessão caída?). Rode de novo depois; quem já recebeu não repete.');
@@ -279,9 +305,49 @@ class WhatsappBroadcast extends Command
             }
         }
 
-        $this->components->info("Concluído: {$sent} enviadas nesta rodada. Faltam ".($pending->count() - $sent).' pendentes.');
+        $this->components->info("Concluído: {$sent} enviadas, {$skipped} sem WhatsApp (puladas). Faltam ".($pending->count() - $sent - $skipped).' pendentes.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Pergunta ao WAHA se o número está no WhatsApp e qual é o endereço dele (o WhatsApp Web
+     * identifica as pessoas por um "LID"; enviar direto para o número falha com "No LID for user").
+     *
+     * @return array{status: 'ok'|'no_whatsapp'|'error', chat_id: ?string}
+     */
+    private function resolveChatId(string $store, string $phone): array
+    {
+        $account = config('whatsapp.waha.accounts.'.strtolower($store));
+
+        if (! is_array($account) || empty($account['base_url'])) {
+            return ['status' => 'error', 'chat_id' => null];
+        }
+
+        try {
+            $response = Http::withHeaders(array_filter(['X-Api-Key' => $account['api_key'] ?? null]))
+                ->timeout(20)
+                ->get(rtrim((string) $account['base_url'], '/').'/api/contacts/check-exists', [
+                    'phone' => $phone,
+                    'session' => $account['session'] ?? '',
+                ]);
+        } catch (Throwable) {
+            return ['status' => 'error', 'chat_id' => null];
+        }
+
+        if (! $response->successful() || ! is_bool($response->json('numberExists'))) {
+            return ['status' => 'error', 'chat_id' => null];
+        }
+
+        if ($response->json('numberExists') === false) {
+            return ['status' => 'no_whatsapp', 'chat_id' => null];
+        }
+
+        $chatId = $response->json('chatId');
+
+        return is_string($chatId) && $chatId !== ''
+            ? ['status' => 'ok', 'chat_id' => $chatId]
+            : ['status' => 'error', 'chat_id' => null];
     }
 
     private function deliver(string $store, string $chatId, string $text): bool
@@ -328,6 +394,25 @@ class WhatsappBroadcast extends Command
         $disk = Storage::disk('local');
         $path = $this->sentPath($message);
         $disk->append($path, $chatId);
+    }
+
+    private const NO_WHATSAPP_PATH = 'broadcasts/no-whatsapp.list';
+
+    /** @return list<string> Telefones que o WhatsApp disse não existir (valem para qualquer texto). */
+    private function noWhatsappList(): array
+    {
+        $disk = Storage::disk('local');
+
+        if (! $disk->exists(self::NO_WHATSAPP_PATH)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('trim', explode("\n", $disk->get(self::NO_WHATSAPP_PATH)))));
+    }
+
+    private function markNoWhatsapp(string $phone): void
+    {
+        Storage::disk('local')->append(self::NO_WHATSAPP_PATH, $phone);
     }
 
     private static function mask(string $phone): string
