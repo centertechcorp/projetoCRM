@@ -380,6 +380,71 @@ class StalledConversationDetectorTest extends TestCase
     }
 
     /** @param  array<int, array{0: string, 1: int}|array{0: string, 1: int, 2: string}>  $messages */
+    public function test_an_active_chat_where_the_customer_says_quero_becomes_a_lead_right_away_without_followup(): void
+    {
+        $this->chat('5534999990501', [['in', -1, 'Oi, quero o iPhone 13']]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(1, $result['leads_created']);
+        $this->assertSame(0, $result['followups_created']);
+        $this->assertSame('open', Lead::sole()->status);
+        $this->assertSame(0, LeadFollowup::count());
+    }
+
+    public function test_quero_is_matched_as_a_whole_word_and_case_insensitive(): void
+    {
+        $this->chat('5534999990502', [['in', -1, 'QUERO saber o preço']]);
+        $this->chat('5534999990503', [['in', -1, 'queria saber o preço']]);
+        $this->chat('5534999990504', [['in', -1, 'esqueroso']]);
+
+        $result = $this->detector()->detect();
+
+        $this->assertSame(1, $result['leads_created']);
+        $this->assertSame('5534999990502', Lead::sole()->customer->phone);
+    }
+
+    public function test_quero_only_counts_when_the_customer_wrote_it(): void
+    {
+        $this->chat('5534999990505', [['out', -1, 'Se você quero comprar, me chama']]);
+
+        $this->assertSame(0, $this->detector()->detect()['leads_created']);
+    }
+
+    public function test_quero_in_an_active_chat_does_not_duplicate_the_lead_when_it_goes_idle_later(): void
+    {
+        $chat = $this->chat('5534999990506', [['in', -1, 'quero ver o preço']]);
+        $this->detector()->detect();
+
+        $chat->update(['last_message_at' => CarbonImmutable::now()->subHours(48)]);
+        $result = $this->detector()->detect();
+
+        $this->assertSame(0, $result['leads_created']);
+        $this->assertSame(1, Lead::count());
+        $this->assertSame(1, LeadFollowup::count());
+    }
+
+    public function test_quero_ignores_excluded_phones_ignored_chats_and_other_stores_when_filtered(): void
+    {
+        config()->set('whatsapp.followup.excluded_phones', ['5534999990001']);
+        $this->chat('5534999990001', [['in', -1, 'quero']]);
+        $ignored =$this->chat('5534999990507', [['in', -1, 'quero']]);
+        $ignored->update(['ignored' => true]);
+
+        $this->assertSame(0, $this->detector()->detect()['leads_created']);
+        $this->assertSame(0, Lead::count());
+    }
+
+    public function test_quero_keyword_list_is_configurable(): void
+    {
+        config()->set('whatsapp.followup.lead_keywords', ['orçamento']);
+        $this->chat('5534999990508', [['in', -1, 'quero comprar']]);
+        $this->chat('5534999990509', [['in', -1, 'preciso de um orçamento']]);
+
+        $this->assertSame(1, $this->detector()->detect()['leads_created']);
+        $this->assertSame('5534999990509', Lead::sole()->customer->phone);
+    }
+
     private function chat(string $phone, array $messages): WhatsappChat
     {
         $chat = WhatsappChat::create([

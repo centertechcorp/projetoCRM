@@ -123,6 +123,14 @@ return [
             '👍', '👍🏻', '👍🏼', '👍🏽', '👍🏾', '👍🏿',
         ],
 
+        // Se o cliente escrever uma dessas palavras (palavra inteira, sem diferenciar maiúscula), a conversa
+        // vira lead NA HORA, sem esperar ficar parada (min_idle_hours). Não cria sugestão de reabordagem,
+        // porque a conversa ainda está ativa. Lista separada por vírgula no .env.
+        'lead_keywords' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('WHATSAPP_LEAD_KEYWORDS', 'quero'))
+        ))),
+
         // Números que nunca viram lead, mesmo se a conversa parar — telefone do dono/equipe
         // usado pra testar a extensão, não é cliente de verdade. Mesmo formato de
         // customers.phone (só dígitos, com DDI). Lista separada por vírgula.

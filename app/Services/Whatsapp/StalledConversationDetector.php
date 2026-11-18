@@ -55,7 +55,77 @@ class StalledConversationDetector
             $skipped += $result['followup_created'] ? 0 : 1;
         }
 
+        $leadsCreated += $this->detectByKeyword($storeId, $idleBefore, $config);
+
         return ['leads_created' => $leadsCreated, 'followups_created' => $followupsCreated, 'chats_skipped' => $skipped];
+    }
+
+    /**
+     * Conversas ainda ativas (não "paradas") em que o cliente escreveu uma palavra de interesse
+     * (config whatsapp.followup.lead_keywords, ex.: "quero"). Viram lead na hora, mas sem sugestão
+     * de reabordagem: o cliente acabou de falar, quem decide o próximo passo é a equipe.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function detectByKeyword(?int $storeId, CarbonImmutable $idleBefore, array $config): int
+    {
+        $keywords = array_values(array_filter((array) ($config['lead_keywords'] ?? [])));
+
+        if ($keywords === []) {
+            return 0;
+        }
+
+        $pattern = '/\b(?:'.implode('|', array_map(fn ($k) => preg_quote(mb_strtolower($k), '/'), $keywords)).')\b/iu';
+
+        $chats = WhatsappChat::query()
+            ->where('kind', 'individual')
+            ->where('ignored', false)
+            ->whereNotNull('last_message_at')
+            ->where('last_message_at', '>', $idleBefore)
+            ->when($storeId !== null, fn ($q) => $q->whereHas('account', fn ($a) => $a->where('store_id', $storeId)))
+            ->whereHas('messages', function ($m) use ($keywords) {
+                $m->where('direction', 'in')->where(function ($w) use ($keywords) {
+                    foreach ($keywords as $keyword) {
+                        $w->orWhereLike('body', '%'.$keyword.'%');
+                    }
+                });
+            })
+            ->with('account')
+            ->get();
+
+        $created = 0;
+
+        foreach ($chats as $chat) {
+            $hasKeyword = $chat->messages()->where('direction', 'in')
+                ->where(function ($w) use ($keywords) {
+                    foreach ($keywords as $keyword) {
+                        $w->orWhereLike('body', '%'.$keyword.'%');
+                    }
+                })
+                ->pluck('body')
+                ->contains(fn ($body) => preg_match($pattern, (string) $body) === 1);
+
+            if (! $hasKeyword) {
+                continue;
+            }
+
+            $customer = $this->findOrCreateCustomer($chat);
+
+            if ($customer === null) {
+                continue;
+            }
+
+            [$lead, $leadCreated] = $this->findOrCreateLead($chat, $customer);
+
+            $lead->last_contact_at = $chat->last_message_at;
+            $lead->whatsapp_chat_id = $chat->id;
+            $this->fillExtractedInfo($lead, $chat);
+            $lead->save();
+
+            $created += $leadCreated ? 1 : 0;
+        }
+
+        return $created;
     }
 
     /** @param  array<string, mixed>  $config */
